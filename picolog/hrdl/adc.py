@@ -6,7 +6,7 @@ import ctypes
 import time
 
 from picolog.constants import Handle, Channel, Status, Info, \
-Error, SettingsError, Progress
+Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime
 
 class PicoLogAdc(object):
     """Represents an instance of the PicoLog ADC driver"""
@@ -37,6 +37,8 @@ class PicoLogAdc(object):
         # buffer length
         self.string_buffer_length = \
         os.getenv('PICOLOG_HRDL_STRING_BUFFER_LENGTH', 1000)
+
+        #
 
     def load_library(self):
         """Loads the PicoLog library"""
@@ -173,8 +175,6 @@ class PicoLogAdc(object):
         length = ctypes.c_short(self.library.HRDLGetUnitInfo(self.handle, \
         ctypes.pointer(message), ctypes.c_short(len(message)), info_type))
 
-        # Note: don't check_for_errors() here, since this uses get_unit_info().
-
         # length is zero if one of the parameters specified in the function call
         # above is out of range, or a null message pointer is specified
         if length.value is 0:
@@ -244,19 +244,30 @@ class PicoLogAdc(object):
         # look up and return corresponding settings error code message
         return SettingsError.get_error_string(self.get_last_settings_error())
 
-    def check_for_errors(self):
+    def raise_unit_error(self):
         """Checks the unit for errors and settings errors
 
         :raises Exception: upon discovering an error
         """
 
-        print("[PicoLogAdc] checking for errors")
+        print("[PicoLogAdc] checking for error")
 
         # check for errors
         error = self.get_last_error()
 
         if Error.is_error(error):
             raise Exception("Error: {0}".format(Error.get_error_string(error)))
+
+        # error is expected but apparently not present...
+        raise Exception("Despite being asked to find it, no error found")
+
+    def raise_unit_settings_error(self):
+        """Checks the unit for settings error
+
+        :raises Exception: upon discovering a settings error
+        """
+
+        print("[PicoLogAdc] checking for settings error")
 
         # check for settings errors
         settings_error = self.get_last_settings_error()
@@ -265,7 +276,94 @@ class PicoLogAdc(object):
             raise Exception("Settings error: {0}".format( \
             SettingsError.get_error_string(settings_error)))
 
-        print("[PicoLogAdc] no errors")
+        # error is expected but apparently not present...
+        raise Exception("Despite being asked to find it, no settings error \
+            found")
+
+    def set_analog_in_channel(self, channel, enabled, vrange, itype):
+        """Sets the specified channel to be an analog input
+
+        :param channel: channel number to set
+        :param enabled: whether channel is enabled or not
+        :param vrange: voltage range to use for this channel
+        :param itype: input type, single ended or differential
+        :raises Exception: when channel is invalid, or voltage range is \
+        invalid, or input type is invalid
+        """
+
+        print("[PicoLogAdc] setting analog input channel")
+
+        # check validity of channel
+        if not Channel.is_valid(channel):
+            raise Exception("Invalid channel specified")
+
+        # check validity of range
+        if not VoltageRange.is_valid(vrange):
+            raise Exception("Invalid voltage range specified")
+
+        # check validity of input type
+        if not InputType.is_valid(itype):
+            raise Exception("Invalid input type")
+
+        # change enabled to integer
+        if enabled:
+            enabled = 1
+        else:
+            enabled = 0
+
+        # print warning to user if differential input is specified on an even
+        # channel
+        if itype is InputType.DIFFERENTIAL and channel % 2 == 0:
+            print("[PicoLogAdc] Warning: setting a differential input on a \
+secondary channel is not possible. Instead set the input on the primary \
+channel number.")
+
+        # set the channel
+        status = ctypes.c_short( \
+        self.library.HRDLSetAnalogInChannel(self.handle, \
+        ctypes.c_short(channel), ctypes.c_short(enabled), \
+        ctypes.c_short(vrange), ctypes.c_short(itype)))
+
+        # check return status
+        if not Status.is_valid_status(status.value):
+            # channel setting failed
+            self.raise_unit_settings_error()
+
+        print("[PicoLogAdc] analog input channel set successfully")
+
+    def set_sample_time(self, sample_time, conversion_time):
+        """Sets the time the unit can take to sample all active inputs.
+
+        The sample_time must be large enough to allow all active channels to
+        convert sequentially, i.e.
+
+            sample_time > conversion_time * active_channels
+
+        where active_channels can be obtained from
+        `~picolog.hrdl.adc.get_enabled_channels_count`
+
+        :param sample_time: the time in milliseconds the unit has to sample \
+        all active inputs
+        :param conversion_time: the time a single channel has to sample its \
+        input
+        """
+
+        print("[PicoLogAdc] setting sample and conversion times")
+
+        # check validity of conversion time
+        if not ConversionTime.is_valid(conversion_time):
+            raise Exception("Invalid conversion time")
+
+        # set sample time
+        status = ctypes.c_short(self.library.HRDLSetInterval(self.handle, \
+        ctypes.c_long(sample_time), ctypes.c_short(conversion_time)))
+
+        # check return status
+        if not Status.is_valid_status(status.value):
+            # setting failure
+            self.raise_unit_settings_error()
+
+        print("[PicoLogAdc] sample and conversion times set successfully")
 
     def get_min_max_adc_counts(self, channel):
         """Fetches the minimum and maximum ADC counts available for the \
@@ -292,9 +390,6 @@ class PicoLogAdc(object):
         self.handle, ctypes.pointer(maximum), ctypes.pointer(minimum), \
         ctypes.c_short(channel)))
 
-        # check for errors
-        self.check_for_errors()
-
         # check return status
         if not Status.is_valid_status(status.value):
             raise Exception('Invalid handle passed to unit')
@@ -320,9 +415,6 @@ class PicoLogAdc(object):
         self.library.HRDLGetNumberOfEnabledChannels(self.handle, \
         ctypes.pointer(enabled_channels)))
 
-        # check for errors
-        self.check_for_errors()
-
         # check return status
         if not Status.is_valid_status(status.value):
             raise Exception('Invalid handle passed to unit')
@@ -345,32 +437,11 @@ if __name__ == '__main__':
     print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
     print("ADC counts: min: {0}, max: {1}".format(*adc.get_min_max_adc_counts(Channel.ANALOG_CHANNEL_1)))
     print("Ready to retrieve values? {0}".format(adc.ready()))
+    print("Setting input channel")
+    adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_1, True, \
+    VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
+    adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_3, True, \
+    VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
+    print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
+    adc.set_sample_time(121, ConversionTime.TIME_MIN)
     adc.close_unit()
-
-# handle = x.HRDLOpenUnit()
-#
-# channel = ctypes.c_short(1)
-# enabled  = ctypes.c_short(1)
-# crange = ctypes.c_short(1)
-# single = ctypes.c_short(1)
-# convint = ctypes.c_short(4)
-# channels = ctypes.c_short()
-# overflow = ctypes.c_short()
-# value = ctypes.c_long()
-# status = ctypes.create_string_buffer(1000)
-#
-# x.HRDLGetUnitInfo(handle, ctypes.pointer(status), ctypes.c_short(1000), ctypes.c_short(8))
-#
-# print "Status: {0}".format(status[:])
-#
-# x.HRDLSetAnalogInChannel(handle, channel, enabled, crange, single)
-#
-# x.HRDLGetNumberOfEnabledChannels(handle, ctypes.pointer(channels))
-#
-# print "Enabled channels: {0}".format(channels)
-#
-# x.HRDLGetSingleValue(handle, channel, crange, convint, single, ctypes.pointer(overflow), ctypes.pointer(value))
-#
-# print "Value: {0}".format(value)
-#
-# x.HRDLCloseUnit(handle)

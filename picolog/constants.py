@@ -27,7 +27,14 @@ class Channel(object):
     ANALOG_CHANNEL_14   = 14
     ANALOG_CHANNEL_15   = 15
     ANALOG_CHANNEL_16   = 16
-    MAX_ANALOG_CHANNELS = ANALOG_CHANNEL_16
+    MIN_ANALOG_CHANNEL  = ANALOG_CHANNEL_1
+    MAX_ANALOG_CHANNEL  = ANALOG_CHANNEL_16
+
+    @classmethod
+    def is_valid(cls, channel):
+        """Checks whether the specified channel is valid"""
+        return channel >= cls.MIN_ANALOG_CHANNEL and \
+        channel <= cls.MAX_ANALOG_CHANNEL
 
 class Info(object):
     DRIVER_VERSION        = 0
@@ -123,11 +130,11 @@ class SettingsError(object):
     strings = {0: "The conversion time parameter is out of range", \
     1: "The sample time interval is out of range", \
     2: "The conversion time chosen is not fast enough to convert all channels \
-    within the sample interval", 3: "The channel being set is valid but not \
-    currently available", 4: "The channel being set is not valid for this \
-    device", 5: "The voltage range being set for this device is not valid", \
+within the sample interval", 3: "The channel being set is valid but not \
+currently available", 4: "The channel being set is not valid for this \
+device", 5: "The voltage range being set for this device is not valid", \
     6: "One or more parameters are invalid", 7: "A conversion is in progress \
-    for a single asynchronous operation", 8: "Communication failed", \
+for a single asynchronous operation", 8: "Communication failed", \
     9: "All settings have been completed successfully"}
 
     @classmethod
@@ -165,3 +172,45 @@ class Progress(object):
     OPEN_PROGRESS_FAIL     = -1
     OPEN_PROGRESS_PENDING  = 0
     OPEN_PROGRESS_COMPLETE = 1
+
+class VoltageRange(object):
+    RANGE_2500_MV = 0
+    RANGE_1250_MV = 1
+    RANGE_625_MV  = 2
+    RANGE_313_MV  = 3
+    RANGE_156_MV  = 4
+    RANGE_78_MV   = 5
+    RANGE_39_MV   = 6
+    RANGE_MIN = RANGE_39_MV
+    RANGE_MAX = RANGE_2500_MV
+
+    @classmethod
+    def is_valid(cls, vrange):
+        """Checks if the specified range is valid"""
+        return vrange >= cls.RANGE_MAX and vrange <= cls.RANGE_MIN
+
+class InputType(object):
+    DIFFERENTIAL = 0
+    # single ended is actually represented by any non-zero C short
+    SINGLE       = 1
+
+    @classmethod
+    def is_valid(cls, itype):
+        """Checks if the specified input range is valid"""
+        # any integer value is valid, so in the spirit of duck-typing...
+        return True
+
+class ConversionTime(object):
+    TIME_60MS  = 0
+    TIME_100MS = 1
+    TIME_180MS = 2
+    TIME_340MS = 3
+    TIME_660MS = 4
+    TIME_MIN   = TIME_60MS
+    TIME_MAX   = TIME_660MS
+
+    @classmethod
+    def is_valid(cls, conversion_time):
+        """Checks if the specified conversion time is valid"""
+        return conversion_time >= cls.TIME_MIN \
+        and conversion_time <= cls.TIME_MAX
