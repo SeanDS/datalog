@@ -10,6 +10,25 @@ class Handle(object):
 
         return False
 
+class Channel(object):
+    ANALOG_CHANNEL_1    = 1
+    ANALOG_CHANNEL_2    = 2
+    ANALOG_CHANNEL_3    = 3
+    ANALOG_CHANNEL_4    = 4
+    ANALOG_CHANNEL_5    = 5
+    ANALOG_CHANNEL_6    = 6
+    ANALOG_CHANNEL_7    = 7
+    ANALOG_CHANNEL_8    = 8
+    ANALOG_CHANNEL_9    = 9
+    ANALOG_CHANNEL_10   = 10
+    ANALOG_CHANNEL_11   = 11
+    ANALOG_CHANNEL_12   = 12
+    ANALOG_CHANNEL_13   = 13
+    ANALOG_CHANNEL_14   = 14
+    ANALOG_CHANNEL_15   = 15
+    ANALOG_CHANNEL_16   = 16
+    MAX_ANALOG_CHANNELS = ANALOG_CHANNEL_16
+
 class Info(object):
     DRIVER_VERSION        = 0
     USB_VERSION           = 1
@@ -69,8 +88,24 @@ class Error(object):
     5: "Maximum devices already open"}
 
     @classmethod
-    def get_error_string(cls, error):
-        return cls.strings[error]
+    def get_error_string(cls, error_code):
+        return cls.strings[error_code]
+
+    @classmethod
+    def is_error(cls, error_code):
+        """Checks if the given error code represents an error"""
+
+        # HACK: override error "Kernel driver too old" - this appears to be a
+        # bug with the driver
+        if error_code is cls.KERNEL_DRIVER_TOO_OLD:
+            return False
+
+        # check if "OK" error code is given
+        if error_code is cls.OK:
+            return False
+
+        # otherwise it's an error
+        return True
 
 class SettingsError(object):
     CONVERSION_TIME_OUT_OF_RANGE = 0
@@ -83,6 +118,32 @@ class SettingsError(object):
     CONVERSION_IN_PROGRESS       = 7
     COMMUNICATION_FAILED         = 8
     OK                           = 9
+
+    """Settings error strings"""
+    strings = {0: "The conversion time parameter is out of range", \
+    1: "The sample time interval is out of range", \
+    2: "The conversion time chosen is not fast enough to convert all channels \
+    within the sample interval", 3: "The channel being set is valid but not \
+    currently available", 4: "The channel being set is not valid for this \
+    device", 5: "The voltage range being set for this device is not valid", \
+    6: "One or more parameters are invalid", 7: "A conversion is in progress \
+    for a single asynchronous operation", 8: "Communication failed", \
+    9: "All settings have been completed successfully"}
+
+    @classmethod
+    def get_error_string(cls, error_code):
+        return cls.strings[error_code]
+
+    @classmethod
+    def is_error(cls, error_code):
+        """Checks if the given settings error code represents an error"""
+
+        # check if "OK" error code is given
+        if error_code is cls.OK:
+            return False
+
+        # otherwise it's an error
+        return True
 
 class Status(object):
     INVALID = 0
@@ -99,3 +160,8 @@ class Status(object):
             return True
 
         return False
+
+class Progress(object):
+    OPEN_PROGRESS_FAIL     = -1
+    OPEN_PROGRESS_PENDING  = 0
+    OPEN_PROGRESS_COMPLETE = 1
