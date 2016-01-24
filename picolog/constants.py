@@ -214,3 +214,13 @@ class ConversionTime(object):
         """Checks if the specified conversion time is valid"""
         return conversion_time >= cls.TIME_MIN \
         and conversion_time <= cls.TIME_MAX
+
+class SampleMethod(object):
+    BLOCK  = 0
+    WINDOW = 1
+    STREAM = 2
+
+    @classmethod
+    def is_valid(cls, sample_method):
+        """Checks if the specified sample method is valid"""
+        return sample_method >= cls.BLOCK and sample_method <= cls.STREAM

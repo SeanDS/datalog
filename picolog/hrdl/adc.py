@@ -6,7 +6,8 @@ import ctypes
 import time
 
 from picolog.constants import Handle, Channel, Status, Info, \
-Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime
+Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime, \
+SampleMethod
 
 class PicoLogAdc(object):
     """Represents an instance of the PicoLog ADC driver"""
@@ -19,6 +20,9 @@ class PicoLogAdc(object):
 
     """C string buffer length"""
     string_buffer_length = None
+
+    """C long array sample buffer length"""
+    sample_buffer_length = None
 
     """Handle representing the PicoLog unit in communication"""
     handle = None
@@ -34,11 +38,21 @@ class PicoLogAdc(object):
         self.library_path = os.getenv('PICOLOG_HRDL_DRIVER_PATH', \
         '/opt/picoscope/lib/libpicohrdl.so')
 
-        # buffer length
+        # string buffer length
         self.string_buffer_length = \
         os.getenv('PICOLOG_HRDL_STRING_BUFFER_LENGTH', 1000)
 
-        #
+        # check validity of string buffer length
+        if self.string_buffer_length <= 0:
+            raise Exception("String buffer length must be positive")
+
+        # sample buffer length
+        self.sample_buffer_length = \
+        os.getenv('PICOLOG_HRDL_SAMPLE_BUFFER_LENGTH', 1000)
+
+        # check validity of sample buffer length
+        if self.sample_buffer_length <= 0:
+            raise Exception("Sample buffer length must be positive")
 
     def load_library(self):
         """Loads the PicoLog library"""
@@ -79,7 +93,8 @@ class PicoLogAdc(object):
 
         # check return status
         if status.value is 0:
-            raise Exception("There is already an open operation in progress")
+            raise Exception("Unit not found, or there is already an open \
+operation in progress")
 
         while True:
             # get progress
@@ -365,6 +380,71 @@ channel number.")
 
         print("[PicoLogAdc] sample and conversion times set successfully")
 
+    def stream(self):
+        """Streams data from the unit"""
+
+        print("[PicoLogAdc] starting unit streaming")
+
+        self._run(SampleMethod.STREAM)
+
+        print("[PicoLogAdc] unit streaming started successfully")
+
+    def _run(self, sample_method):
+        """Runs the unit recording functionality
+
+        :param sample_method: sampling method
+        :raises Exception: if sample_method is invalid or if run failed
+        """
+
+        # check validity of sample method
+        if not SampleMethod.is_valid(sample_method):
+            raise Exception("Invalid sample method")
+
+        # run
+        status = ctypes.c_short(self.library.HRDLRun(self.handle, \
+        ctypes.c_long(self.sample_buffer_length), \
+        ctypes.c_short(sample_method)))
+
+        # check return status
+        if not Status.is_valid_status(status.value):
+            # run failure
+            self.raise_unit_error()
+
+    def get_samples(self):
+        """Fetches uncollected samples from the unit"""
+
+        # create C long times array
+        times = (ctypes.c_long * self.sample_buffer_length)()
+
+        # create C long values array
+        values = (ctypes.c_long * self.sample_buffer_length)()
+
+        # calculate number of values to collect for each channel
+        samples_per_channel = self.sample_buffer_length // \
+        self.get_enabled_channels_count()
+
+        # get samples, without using the overflow short parameter (None == NULL)
+        num_values = ctypes.c_long( \
+        self.library.HRDLGetTimesAndValues(self.handle, ctypes.pointer(times), \
+        ctypes.pointer(values), None, ctypes.c_long(samples_per_channel)))
+
+        # check return status
+        if num_values is 0:
+            raise Exception("Call failed or no values available")
+
+        # return data as list
+        return (self.sample_array_to_list(times), self.sample_array_to_list(values))
+
+    def sample_array_to_list(self, data_array):
+        """Converts a C type samples array into a Python list
+
+        :param data_array: C type long array to convert
+        :return: list of data elements
+        """
+
+        # convert to list and return
+        return [i for i in data_array]
+
     def get_min_max_adc_counts(self, channel):
         """Fetches the minimum and maximum ADC counts available for the \
         connected device.
@@ -431,17 +511,30 @@ channel number.")
 
 if __name__ == '__main__':
     adc = PicoLogAdc()
-
-    adc.open_unit_with_progress()
-    print(adc.get_full_unit_info())
-    print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
-    print("ADC counts: min: {0}, max: {1}".format(*adc.get_min_max_adc_counts(Channel.ANALOG_CHANNEL_1)))
-    print("Ready to retrieve values? {0}".format(adc.ready()))
-    print("Setting input channel")
-    adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_1, True, \
-    VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
-    adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_3, True, \
-    VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
-    print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
-    adc.set_sample_time(121, ConversionTime.TIME_MIN)
-    adc.close_unit()
+    try:
+        adc.open_unit_with_progress()
+        adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_1, True, \
+        VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
+        #adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_3, True, \
+        #VoltageRange.RANGE_39_MV, InputType.DIFFERENTIAL)
+        print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
+        adc.set_sample_time(121, ConversionTime.TIME_MIN)
+        adc.stream()
+        times = []
+        values = []
+        for i in range(1000):
+            if adc.ready():
+                print(i)
+                print("ADC ready to retrieve values")
+                (ttime, value) = adc.get_samples()
+                print(ttime)
+                # TODO: look at ttime, which should be non-zero if the sample is
+                # new. Then store corresponding value. Do this roughly every half
+                # total sample time.
+            time.sleep(0.01)
+        adc.close_unit()
+        print(times)
+        print(values)
+    except:
+        adc.close_unit()
+        raise
