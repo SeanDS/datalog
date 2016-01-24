@@ -184,10 +184,20 @@ class VoltageRange(object):
     RANGE_MIN = RANGE_39_MV
     RANGE_MAX = RANGE_2500_MV
 
+    """Voltage mapping, in [V]"""
+    voltages = {RANGE_2500_MV: 2.5, RANGE_1250_MV: 1.25, RANGE_625_MV: 0.625, \
+    RANGE_313_MV: 0.313, RANGE_156_MV: 0.156, RANGE_78_MV: 0.078, \
+    RANGE_39_MV: 0.039}
+
     @classmethod
     def is_valid(cls, vrange):
         """Checks if the specified range is valid"""
         return vrange >= cls.RANGE_MAX and vrange <= cls.RANGE_MIN
+
+    @classmethod
+    def get_max_voltage(cls, vrange):
+        """Gets the maximum input voltage for the given range constant"""
+        return cls.voltages[vrange]
 
 class InputType(object):
     DIFFERENTIAL = 0
