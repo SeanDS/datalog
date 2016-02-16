@@ -15,7 +15,7 @@ try:
     adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_4, True, \
     VoltageRange.RANGE_2500_MV, InputType.SINGLE)
     print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
-    adc.set_sample_time(1000, ConversionTime.TIME_660MS)
+    adc.set_sample_time(2500, ConversionTime.TIME_660MS)
     adc.stream()
 
     import csv
