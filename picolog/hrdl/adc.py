@@ -521,13 +521,13 @@ channel is not possible. Instead set the input on the primary channel number.")
         (min_counts, max_counts) = self.get_min_max_adc_counts(channel)
 
         # total counts (subtract 1 since zero is only included in positive counts)
-        counts = min_counts + max_counts - 1
+        total_counts = min_counts + max_counts - 1
 
         # get maximum voltage (on a single side of the input)
         v_max = self.get_channel_max_voltage(channel)
 
         # calculate conversion
-        scale = v_max / counts
+        scale = v_max / total_counts
 
         # return voltages
         return [count * scale for count in counts]
