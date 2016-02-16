@@ -1,4 +1,7 @@
 from picolog.hrdl.adc import PicoLogAdc
+from picolog.constants import Handle, Channel, Status, Info, \
+Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime, \
+SampleMethod
 
 adc = PicoLogAdc()
 try:
