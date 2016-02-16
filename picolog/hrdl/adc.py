@@ -520,14 +520,14 @@ channel is not possible. Instead set the input on the primary channel number.")
         # get minimum and maximum counts for this channel
         (min_counts, max_counts) = self.get_min_max_adc_counts(channel)
 
-        # total counts (subtract 1 since zero is only included in positive counts)
-        total_counts = min_counts + max_counts - 1
+        # total counts (add 1 since zero is only included in negative counts)
+        total_counts = max_counts - min_counts + 1
 
         # get maximum voltage (on a single side of the input)
         v_max = self.get_channel_max_voltage(channel)
 
-        # calculate conversion
-        scale = v_max / total_counts
+        # calculate conversion (twice maximum because it's + and -)
+        scale = 2 * v_max / total_counts
 
         # return voltages
         return [count * scale for count in counts]
@@ -569,7 +569,7 @@ channel is not possible. Instead set the input on the primary channel number.")
 
         # get minimum and maximum counts
         status = ctypes.c_short(self.library.HRDLGetMinMaxAdcCounts( \
-        self.handle, ctypes.pointer(maximum), ctypes.pointer(minimum), \
+        self.handle, ctypes.pointer(minimum), ctypes.pointer(minimum), \
         ctypes.c_short(channel)))
 
         # check return status
