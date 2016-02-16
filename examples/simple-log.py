@@ -1,3 +1,5 @@
+import time
+
 from picolog.hrdl.adc import PicoLogAdc
 from picolog.constants import Handle, Channel, Status, Info, \
 Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime, \
@@ -26,12 +28,16 @@ try:
             if adc.ready():
                 #print(i)
                 #print("ADC ready to retrieve values")
-                (stimes, svalues) = adc.get_samples()
-                if stimes:
-                    print(svalues)
+                payload = adc._get_sample_payload()
+                #(stimes, svalues) = adc.get_samples()
+                if payload:
+                    # convert counts to volts (assume all channels the same as 1)
+                    data = [payload[0][0]] + adc.counts_to_volts(payload[1][0:4], Channel.ANALOG_CHANNEL_1)
+                    print(data)
                     #print(stimes, adc.counts_to_volts(svalues, Channel.ANALOG_CHANNEL_1))
                     #data = [stimes[0], adc.counts_to_volts(svalues, Channel.ANALOG_CHANNEL_1)[0]]
-                    #writer.writerows([data])
+                    writer.writerows([data])
+                    f.flush()
                     #times.extend(stimes)
                     #values.extend(adc.counts_to_volts(svalues, Channel.ANALOG_CHANNEL_15))
             time.sleep(1.5)
