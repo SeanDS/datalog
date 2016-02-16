@@ -566,7 +566,7 @@ channel is not possible. Instead set the input on the primary channel number.")
 
         # get minimum and maximum counts
         status = ctypes.c_short(self.library.HRDLGetMinMaxAdcCounts( \
-        self.handle, ctypes.pointer(minimum), ctypes.pointer(minimum), \
+        self.handle, ctypes.pointer(minimum), ctypes.pointer(maximum), \
         ctypes.c_short(channel)))
 
         # check return status
