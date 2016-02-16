@@ -15,7 +15,7 @@ try:
     adc.set_analog_in_channel(Channel.ANALOG_CHANNEL_4, True, \
     VoltageRange.RANGE_2500_MV, InputType.SINGLE)
     print("Enabled channels: {0}".format(adc.get_enabled_channels_count()))
-    adc.set_sample_time(2500, ConversionTime.TIME_660MS)
+    adc.set_sample_time(1500, ConversionTime.TIME_340MS)
     adc.stream()
 
     import csv
@@ -34,7 +34,7 @@ try:
                     #writer.writerows([data])
                     #times.extend(stimes)
                     #values.extend(adc.counts_to_volts(svalues, Channel.ANALOG_CHANNEL_15))
-            #time.sleep(0.121 * 10)
+            time.sleep(1.5)
         adc.close_unit()
 except KeyboardInterrupt:
     adc.close_unit()
