@@ -35,7 +35,11 @@ class PicoLogAdc(object):
     channel_voltages = {}
 
     def __init__(self, log_info=None, log_error=sys.stderr):
-        """Initialises the PicoLog ADC interface"""
+        """Initialises the PicoLog ADC interface
+
+        :param log_info:
+
+        """
 
         # create logger
         self.logger = logging.getLogger('PicoLog-ADC')
