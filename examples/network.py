@@ -7,9 +7,10 @@ import select
 import threading
 import time
 import re
+import ConfigParser
 
 from picolog.hrdl.adc import PicoLogAdc
-from picolog.constants import Channel
+from picolog.constants import Channel, VoltageRange, InputType
 
 """
 Simple networking tools.
@@ -37,6 +38,9 @@ class Server(object):
     """Socket object"""
     _socket = None
 
+    """ADC object"""
+    _adc = None
+
     """Command strings"""
     command = {"timestamp": "timestamp", "datasince": "datasince"}
 
@@ -47,30 +51,44 @@ class Server(object):
     """Backlog time limit"""
     backlog_limit = None
 
+    """Maximum ADC connection attempts"""
+    max_adc_connection_attempts = None
+
     """Server running status, used by threads"""
     server_running = None
 
     """Connected clients"""
     _clients = None
 
-    def __init__(self, host, port, max_connections=5, print_info=True, \
+    """ADC channel configuration"""
+    channel_config = None
+
+    """Default ADC channel configuration"""
+    default_channel_config = {"channel": -1, "enabled": False, "range": \
+    VoltageRange.RANGE_2500_MV, "type": InputType.SINGLE}
+
+    def __init__(self, host, port, channel_config_path=None, max_connections=5, print_info=True, \
     print_errors=True, info_prefix="[info]", error_prefix="[error]"):
         """Initialises the server
 
         :param host: host to bind server to
         :param port: port to bind server to
+        :param channel_config_file: ADC channel configuration path
         :param max_connections: maximum number of simultaneous connections to \
         accept
         :param print_errors: whether to print logger errors to stream
         :param error_prefix: the prefix to use for errors
         """
 
-        # set settings
+        # arguments
         self.host = host
         self.port = int(port)
         self.max_connections = int(max_connections)
         self.print_errors = bool(print_errors)
         self.error_prefix = error_prefix
+
+        # parse configuration
+        self.parse_channel_config(channel_config_path)
 
         # compile regex
         self.compile_regex()
@@ -82,12 +100,37 @@ class Server(object):
         """Loads environment configuration"""
 
         # socket buffer length
-        self.socket_buffer_length = os.getenv(\
-        "PICOLOG_SIMPLE_SERVER_SOCKET_BUFFER_LENGTH", 1000)
+        self.socket_buffer_length = os.getenv( \
+        "PICOLOG_SERVER_SOCKET_BUFFER_LENGTH", 1000)
 
         # allowed time (in ms) backlog data can be requested
-        self.backlog_limit = os.getenv("PICOLOG_SIMPLE_SERVER_BACKLOG_LIMIT", \
+        self.backlog_limit = os.getenv("PICOLOG_SERVER_BACKLOG_LIMIT", \
         1000 * 60 * 60 * 24)
+
+        # max ADC connection attempts
+        self.max_adc_connection_attempts = os.getenv( \
+        "PICOLOG_SERVER_MAX_ADC_CONNECTION_ATTEMPTS", 5)
+
+    def parse_channel_config(self, channel_config_path):
+        """Parses the channel configuration found in the specified path
+
+        :param channel_config_path: path to channel configuration file
+        """
+
+        # create channel config dict
+        self.channel_config = {}
+
+        if channel_config_path is None:
+            raise Exception("Channel configuration cannot be empty")
+
+        # instantiate parser
+        parser = ConfigParser.RawConfigParser(self.default_channel_config)
+
+        # parse
+        parser.read(channel_config_path)
+
+        # save config sections as channels
+        self.channels = parser.sections()
 
     def compile_regex(self):
         """Compiles built-in regex strings into Python regular expression \
@@ -105,8 +148,11 @@ class Server(object):
         """Opens a connection to the ADC and binds the server to the \
         preconfigured socket"""
 
-        # start ADC
-        self._start_adc()
+        # open ADC
+        self._open_adc()
+
+        # configure ADC
+        self._configure_adc()
 
         # bind to socket
         self._bind()
@@ -149,30 +195,71 @@ class Server(object):
         """Closes all open connections, including to the ADC"""
 
         # close clients
-        self.close_clients()
+        self._close_clients()
 
         # close socket
         self._socket.close()
 
         # close ADC
-        #self._adc.close()
+        self._close_adc()
 
         print("Bye")
 
-    def close_clients(self):
+    def _close_clients(self):
         """Closes client connections"""
 
         if self._clients is not None:
             for client in self._clients:
                 client.stop()
 
+    def _close_adc(self):
+        """Closes the ADC"""
+
+        if self._adc is not None:
+            self._adc.close_unit()
+
     def get_timestamp(self):
         """Returns the current server timestamp in milliseconds"""
         return int(round(time.time() * 1000))
 
-    def _start_adc(self):
+    def _open_adc(self):
         """Opens the ADC as many times as necessary"""
-        pass
+
+        # ADC object
+        adc = PicoLogAdc()
+
+        # connection attempts
+        attempts = 0
+
+        while True:
+            # attempt to open ADC
+            try:
+                # increment attempts
+                attempts += 1
+
+                # open ADC
+                adc.open_unit()
+
+                # exit loop
+                break
+            except Exception, e:
+                # ADC reported issue
+
+                # check if we're out of attempts
+                if attempts >= self.max_adc_connection_attempts:
+                    raise Exception("Could not open ADC after {0} attempt(s). \
+Last error: {1}".format(attempts, e))
+
+        # save ADC object
+        self._adc = adc
+
+    def _configure_adc(self):
+        """Configures the ADC using preconfigured settings"""
+
+        # activate channels
+        for channel in self.channels:
+            self._adc.set_analog_in_channel(channel["channel"], \
+            channel["enabled"], channel["range"], channel["type"])
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
