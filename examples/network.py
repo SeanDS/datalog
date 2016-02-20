@@ -29,10 +29,14 @@ class Server(object):
     """Maximum number of simultaneous connections"""
     max_connections = None
 
-    """Whether to print errors"""
+    """Whether to print errors, warnings and info"""
+    print_info = None
+    print_warnings = None
     print_errors = None
 
-    """Error prefix"""
+    """Print prefixes"""
+    info_prefix = None
+    warning_prefix = None
     error_prefix = None
 
     """Socket object"""
@@ -54,6 +58,9 @@ class Server(object):
     """Maximum ADC connection attempts"""
     max_adc_connection_attempts = None
 
+    """Minimum delay, in s, between ADC connection attempts"""
+    min_adc_reconnection_delay = None
+
     """Server running status, used by threads"""
     server_running = None
 
@@ -67,8 +74,10 @@ class Server(object):
     default_channel_config = {"channel": -1, "enabled": False, "range": \
     VoltageRange.RANGE_2500_MV, "type": InputType.SINGLE}
 
-    def __init__(self, host, port, channel_config_path=None, max_connections=5, print_info=True, \
-    print_errors=True, info_prefix="[info]", error_prefix="[error]"):
+    def __init__(self, host="localhost", port=50000, channel_config_path=None, \
+    max_connections=5, print_info=True, print_warnings=True, \
+    print_errors=True, info_prefix="[info]", warning_prefix="[warning]", \
+    error_prefix="[error]"):
         """Initialises the server
 
         :param host: host to bind server to
@@ -84,20 +93,28 @@ class Server(object):
         self.host = host
         self.port = int(port)
         self.max_connections = int(max_connections)
+        self.print_info = bool(print_info)
+        self.print_warnings = bool(print_warnings)
         self.print_errors = bool(print_errors)
+        self.info_prefix = info_prefix
+        self.warning_prefix = warning_prefix
         self.error_prefix = error_prefix
 
-        # parse configuration
-        self.parse_channel_config(channel_config_path)
+        # load environment configuration
+        self.load_env_config()
 
         # compile regex
         self.compile_regex()
 
-        # load environment configuration
-        self.load_config()
+        # parse configuration
+        self.parse_channel_config(channel_config_path)
 
-    def load_config(self):
+        self.info("Server ready to be started")
+
+    def load_env_config(self):
         """Loads environment configuration"""
+
+        self.info("Loading environment configuration")
 
         # socket buffer length
         self.socket_buffer_length = os.getenv( \
@@ -109,7 +126,50 @@ class Server(object):
 
         # max ADC connection attempts
         self.max_adc_connection_attempts = os.getenv( \
-        "PICOLOG_SERVER_MAX_ADC_CONNECTION_ATTEMPTS", 5)
+        "PICOLOG_SERVER_MAX_ADC_CONNECTION_ATTEMPTS", 10)
+
+        # minimum ADC reconnection delay
+        self.min_adc_reconnection_delay = os.getenv( \
+        "PICOLOG_SERVER_MIN_ADC_RECONNECTION_DELAY", 0.5)
+
+    def error(self, message):
+        """Prints the specified error message
+
+        :param message: error message to print
+        """
+
+        # print only if allowed
+        if self.print_errors:
+            self._print_message(message, self.error_prefix)
+
+    def warning(self, message):
+        """Prints the specified warning message
+
+        :param message: warning message to print
+        """
+
+        # print only if allowed
+        if self.print_warnings:
+            self._print_message(message, self.warning_prefix)
+
+    def info(self, message):
+        """Prints the specified info message
+
+        :param message: info message to print
+        """
+
+        # print only if allowed
+        if self.print_info:
+            self._print_message(message, self.info_prefix)
+
+    def _print_message(self, message, prefix=""):
+        """Prints the specified message with an optional prefix to stdout
+
+        :param message: message to print
+        :param prefix: prefix for message
+        """
+
+        print("{0} {1}".format(prefix, message))
 
     def parse_channel_config(self, channel_config_path):
         """Parses the channel configuration found in the specified path
@@ -117,11 +177,17 @@ class Server(object):
         :param channel_config_path: path to channel configuration file
         """
 
+        self.info("Parsing channel config")
+
         # create channel config dict
         self.channel_config = {}
 
+        # tell user if there are no active channels
         if channel_config_path is None:
-            raise Exception("Channel configuration cannot be empty")
+            # no channels to parse
+            self.warning("No channels are active. Cowardly carrying on.")
+
+            return
 
         # instantiate parser
         parser = ConfigParser.RawConfigParser(self.default_channel_config)
@@ -130,11 +196,13 @@ class Server(object):
         parser.read(channel_config_path)
 
         # save config sections as channels
-        self.channels = parser.sections()
+        self.channel_config = parser.sections()
 
     def compile_regex(self):
         """Compiles built-in regex strings into Python regular expression \
         objects"""
+
+        self.info("Compiling regex handlers")
 
         # create dict if not yet created
         if self.regex_objects is None:
@@ -147,6 +215,8 @@ class Server(object):
     def start(self):
         """Opens a connection to the ADC and binds the server to the \
         preconfigured socket"""
+
+        self.info("Starting server")
 
         # open ADC
         self._open_adc()
@@ -203,7 +273,7 @@ class Server(object):
         # close ADC
         self._close_adc()
 
-        print("Bye")
+        self.info("Bye")
 
     def _close_clients(self):
         """Closes client connections"""
@@ -250,6 +320,14 @@ class Server(object):
                     raise Exception("Could not open ADC after {0} attempt(s). \
 Last error: {1}".format(attempts, e))
 
+            # wait exponentially longer than last time
+            delay = self.min_adc_reconnection_delay * attempts ** 2
+
+            self.warning("Could not connect to ADC. Waiting {0}s before next \
+attempt".format(delay))
+
+            time.sleep(delay)
+
         # save ADC object
         self._adc = adc
 
@@ -257,7 +335,7 @@ Last error: {1}".format(attempts, e))
         """Configures the ADC using preconfigured settings"""
 
         # activate channels
-        for channel in self.channels:
+        for channel in self.channel_config:
             self._adc.set_analog_in_channel(channel["channel"], \
             channel["enabled"], channel["range"], channel["type"])
 
@@ -270,7 +348,7 @@ Last error: {1}".format(attempts, e))
         # bind the socket to the preconfigured host and port
         self._socket.bind((self.host, self.port))
 
-        print("Server bound to {0} on port {1}".format(self.host, self.port))
+        self.info("Server bound to {0} on port {1}".format(self.host, self.port))
 
     def _listen(self):
         """Starts listening to the socket for a connection"""
@@ -302,7 +380,7 @@ class Client(threading.Thread):
         self.connection = connection
         self.address = address
 
-        print("Connection {0} from {1}".format(connection, address))
+        self.info("Connection {0} from {1}".format(connection, address))
 
     def run(self):
         """Runs the client thread"""
@@ -321,7 +399,7 @@ class Client(threading.Thread):
         :param data: data sent by client
         """
 
-        print("Received data: {0}".format(data))
+        self.info("Received data: {0}".format(data))
 
         try:
             if data == self.server.command["timestamp"]:
@@ -346,7 +424,7 @@ class Client(threading.Thread):
         """Sends the current timestamp to the connected client
 
         """
-        print("Sending timestamp")
+        self.info("Sending timestamp")
         self.connection.send(str(self.server.get_timestamp()))
 
     def _handle_command_data_since(self, data):
