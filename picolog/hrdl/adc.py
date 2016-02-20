@@ -9,6 +9,7 @@ import time
 from picolog.constants import Handle, Channel, Status, Info, \
 Error, SettingsError, Progress, VoltageRange, InputType, ConversionTime, \
 SampleMethod
+from picolog.data import Reading
 
 class PicoLogAdc(object):
     """Represents an instance of the PicoLog ADC driver"""
@@ -30,6 +31,9 @@ class PicoLogAdc(object):
 
     """Handle representing the PicoLog unit in communication"""
     handle = None
+
+    """Enabled channels set"""
+    enabled_channels = set()
 
     """Channel voltage settings (using VoltageRange constants)"""
     channel_voltages = {}
@@ -395,6 +399,9 @@ channel is not possible. Instead set the input on the primary channel number.")
             # channel setting failed
             self.raise_unit_settings_error()
 
+        # add channel to enabled set
+        self.enabled_channels.update([channel])
+
         # set the channel voltage dict
         self.channel_voltages[channel] = vrange
 
@@ -464,46 +471,60 @@ channel is not possible. Instead set the input on the primary channel number.")
             # run failure
             self.raise_unit_error()
 
-    def get_samples(self):
-        """Fetches uncollected samples from the unit"""
+    def get_readings(self):
+        """Fetches uncollected ADC readings
 
-        # get raw samples
-        (times, values) = self._get_sample_payload()
-
-        # collect indices corresponding to non-zero times
-        indices = [i for i, e in enumerate(times) if e is not 0]
-
-        # return samples
-        return (map(times.__getitem__, indices), map(values.__getitem__, indices))
-
-    def _get_sample_payload(self):
-        """Fetches uncollected sample payload from the unit
-
-        This function returns the raw payload, without removing zero values
-        present in the buffer.
+        A reading is a full set of channel samples for a given time. This method
+        returns a list of readings, in chronological order.
         """
+
+        # get payload
+        (times, samples) = self._get_payload()
+
+        # empty list of readings
+        readings = []
+
+        # iterate over individual readings
+        for (reading_time, reading_samples) in zip(times, samples):
+            # add new reading to list
+            readings.append(Reading(reading_time, self.enabled_channels, \
+            reading_samples))
+
+        return readings
+
+    def _get_payload(self):
+        """Fetches uncollected sample payload from the unit"""
 
         # create C long times array
         times = (ctypes.c_long * self.sample_buffer_length)()
 
         # create C long values array
-        values = (ctypes.c_long * self.sample_buffer_length)()
+        samples = (ctypes.c_long * self.sample_buffer_length)()
 
         # calculate number of values to collect for each channel
         samples_per_channel = self.sample_buffer_length // \
         self.get_enabled_channels_count()
+        # FIXME: is the call to get_enabled_channels_count (which communicates
+        # with the ADC) really necessary? Can call len(self.enabled_channels)?
 
         # get samples, without using the overflow short parameter (None == NULL)
         num_values = ctypes.c_long( \
         self.library.HRDLGetTimesAndValues(self.handle, ctypes.pointer(times), \
-        ctypes.pointer(values), None, ctypes.c_long(samples_per_channel)))
+        ctypes.pointer(samples), None, ctypes.c_long(samples_per_channel)))
 
         # check return status
         if num_values is 0:
             raise Exception("Call failed or no values available")
 
-        # return data as lists
-        return (self._sample_array_to_list(times), self._sample_array_to_list(values))
+        # convert times and values into Python lists
+        times = self._sample_array_to_list(times)
+        samples = self._sample_array_to_list(samples)
+
+        # collect indices corresponding to non-zero times
+        indices = [i for i, e in enumerate(times) if e is not 0]
+
+        # return times and values
+        return (map(times.__getitem__, indices), map(samples.__getitem__, indices))
 
     def _sample_array_to_list(self, data_array):
         """Converts a C type samples array into a Python list
