@@ -52,9 +52,6 @@ class Server(object):
     regex = {"datasince": "datasince.*?(\\d{13,})"}
     regex_objects = None
 
-    """Backlog time limit"""
-    backlog_limit = None
-
     """Maximum ADC connection attempts"""
     max_adc_connection_attempts = None
 
@@ -119,10 +116,6 @@ class Server(object):
         # socket buffer length
         self.socket_buffer_length = os.getenv( \
         "PICOLOG_SERVER_SOCKET_BUFFER_LENGTH", 1000)
-
-        # allowed time (in ms) backlog data can be requested
-        self.backlog_limit = os.getenv("PICOLOG_SERVER_BACKLOG_LIMIT", \
-        1000 * 60 * 60 * 24)
 
         # max ADC connection attempts
         self.max_adc_connection_attempts = os.getenv( \
@@ -459,10 +452,6 @@ class Client(threading.Thread):
         :param timestamp: timestamp to send data since
         :raises Exception: if timestamp is too far in the past
         """
-
-        if (self.server.get_timestamp() - timestamp) \
-         > self.server.backlog_limit:
-            raise Exception("Cannot request data from that long ago")
 
         self.connection.send("data since {0}".format(timestamp))
 
