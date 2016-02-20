@@ -4,7 +4,10 @@ This is a Python library to interface with a [PicoLog ADC 20/24](https://www.pic
 ## Prerequisites
 Python 2.7+ (not tested with Python 3, but possibly works)
 
-PicoLog ADC 20/24 hardware and driver (libpicohrdl). The driver is not, as of the time of writing, publicly available but can be obtained by [asking the support staff nicely](https://www.picotech.com/support/topic21751.html).
+PicoLog ADC 20/24 hardware and driver (libpicohrdl). The driver is not, as of the time of writing, publicly available but can be obtained by [asking the support staff nicely](https://www.picotech.com/support/topic21751.html). You need to connect the hardware and install the driver before using this software, of course.
+
+## Use
+The main functionality is implemented in `picolog/hrdl/adc.py` and this class can be used on its own. The documentation should help to get you started. An example of the data server is provided in `examples/server.py`. Just run it in Python with your ADC 20/24 connected.
 
 ## Contributing
 I welcome contributions to the codebase - just open a pull request!
