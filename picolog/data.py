@@ -80,20 +80,14 @@ class DataStore(object):
     """Readings"""
     readings = None
 
-    def __init__(self):
+    def __init__(self, max_readings):
         """Initialises the datastore"""
 
-        # load config from environment
-        self.load_config()
+        # set parameters
+        self.max_readings = max_readings
 
         # initialise list of readings
         self.readings = []
-
-    def load_config(self):
-        """Loads configuration options from environment"""
-
-        # maximum readings
-        self.max_readings = os.getenv('PICOLOG_DATASTORE_MAX_READINGS', 1000)
 
     def insert(self, readings):
         """Inserts the specified readings into the datastore

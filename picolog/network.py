@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import os
 import sys
+import logging
 import socket
 import select
 import threading
@@ -10,34 +11,30 @@ import re
 import ConfigParser
 
 from picolog.hrdl.adc import PicoLogAdc
+from picolog.fetch import Retriever
+from picolog.logstream import LevelBasedHandler
 from picolog.constants import Channel, VoltageRange, InputType
 
 """
-Simple networking tools.
+ADC networking tools.
 """
 
 class Server(object):
-    """Server which binds to a port and accepts text commands on that port. \
-    Connected clients can request data and other server information."""
+    """Server to govern the ADC's data logging and storage, as well as to serve \
+    connected clients.
 
-    """Host to bind to"""
-    host = None
+    The server binds to a port and accepts text commands on that port. Clients
+    can request data and other server information.
+    """
 
-    """Port to bind to"""
-    port = None
+    """Configuration"""
+    config = None
 
-    """Maximum number of simultaneous connections"""
-    max_connections = None
+    """ADC channel configuration"""
+    channel_config = None
 
-    """Whether to print errors, warnings and info"""
-    print_info = None
-    print_warnings = None
-    print_errors = None
-
-    """Print prefixes"""
-    info_prefix = None
-    warning_prefix = None
-    error_prefix = None
+    """Logger object"""
+    logger = None
 
     """Socket object"""
     _socket = None
@@ -45,124 +42,116 @@ class Server(object):
     """ADC object"""
     _adc = None
 
+    """Retriever (to fetch stuff from ADC) object"""
+    _retriever = None
+
     """Command strings"""
-    command = {"timestamp": "timestamp", "datasince": "datasince"}
+    command = {"timestamp": "timestamp", "dataafter": "dataafter", \
+    "streamstarttimestamp": "streamstarttimestamp"}
 
     """Regular expressions"""
-    regex = {"datasince": "datasince.*?(\\d{13,})"}
+    regex = {"dataafter": "dataafter.*?(\\d{1,})"}
     regex_objects = None
 
-    """Maximum ADC connection attempts"""
-    max_adc_connection_attempts = None
-
-    """Minimum delay, in s, between ADC connection attempts"""
-    min_adc_reconnection_delay = None
+    """Timestamp corresponding to the start of a data stream"""
+    stream_start_timestamp = None
 
     """Server running status, used by threads"""
     server_running = None
 
+    """ADC datastore object"""
+    datastore = None
+
     """Connected clients"""
     _clients = None
 
-    """ADC channel configuration"""
-    channel_config = None
-
-    """Default ADC channel configuration"""
-    default_channel_config = {"channel": -1, "enabled": False, "range": \
-    VoltageRange.RANGE_2500_MV, "type": InputType.SINGLE}
-
-    def __init__(self, host="localhost", port=50000, channel_config_path=None, \
-    max_connections=5, print_info=True, print_warnings=True, \
-    print_errors=True, info_prefix="[info]", warning_prefix="[warning]", \
-    error_prefix="[error]"):
+    def __init__(self, config_path=None, channel_config_path=None, \
+    info_stream=sys.stdout, error_stream=sys.stderr):
         """Initialises the server
 
-        :param host: host to bind server to
-        :param port: port to bind server to
+        :param config_path: configuration path
         :param channel_config_file: ADC channel configuration path
-        :param max_connections: maximum number of simultaneous connections to \
-        accept
-        :param print_errors: whether to print logger errors to stream
-        :param error_prefix: the prefix to use for errors
+        :param info_stream: stream to write info to
+        :param error_stream: stream to write errors to
         """
 
-        # arguments
-        self.host = host
-        self.port = int(port)
-        self.max_connections = int(max_connections)
-        self.print_info = bool(print_info)
-        self.print_warnings = bool(print_warnings)
-        self.print_errors = bool(print_errors)
-        self.info_prefix = info_prefix
-        self.warning_prefix = warning_prefix
-        self.error_prefix = error_prefix
+        # parse configuration
+        self.parse_config(config_path)
 
-        # load environment configuration
-        self.load_env_config()
+        # create logger (now that we have the config)
+        self._create_logger(info_stream, error_stream)
+
+        # parse the channel config
+        self.parse_channel_config(channel_config_path)
 
         # compile regex
         self.compile_regex()
 
-        # parse configuration
-        self.parse_channel_config(channel_config_path)
+        self.logger.info("Server ready to be started")
 
-        self.info("Server ready to be started")
+    def _create_logger(self, info_stream, error_stream):
+        """Creates a logger using the specified streams"""
 
-    def load_env_config(self):
-        """Loads environment configuration"""
+        # create logger instance
+        self.logger = logging.getLogger('PicoLogServer')
 
-        self.info("Loading environment configuration")
+        # set minimum level
+        self.logger.setLevel(logging.INFO)
 
-        # socket buffer length
-        self.socket_buffer_length = os.getenv( \
-        "PICOLOG_SERVER_SOCKET_BUFFER_LENGTH", 1000)
+        # set OS-specific logging black holes if necessary
+        if info_stream is None:
+            info_stream = open(os.devnull, "w")
+        if error_stream is None:
+            error_stream = open(os.devnull, "w")
 
-        # max ADC connection attempts
-        self.max_adc_connection_attempts = os.getenv( \
-        "PICOLOG_SERVER_MAX_ADC_CONNECTION_ATTEMPTS", 10)
+        # create log stream handler
+        log_handler = LevelBasedHandler(info_stream, error_stream)
+        log_handler.setLevel(logging.INFO)
 
-        # minimum ADC reconnection delay
-        self.min_adc_reconnection_delay = os.getenv( \
-        "PICOLOG_SERVER_MIN_ADC_RECONNECTION_DELAY", 0.5)
+        # set formatter
+        formatter = logging.Formatter(self.config["server"]["log_format"])
+        log_handler.setFormatter(formatter)
 
-    def error(self, message):
-        """Prints the specified error message
+        # add stream handler to logger
+        self.logger.addHandler(log_handler)
 
-        :param message: error message to print
+    def parse_config(self, config_path):
+        """Parses the configuration found in the specified path
+
+        :param config_path: the path to the configuration file
         """
 
-        # print only if allowed
-        if self.print_errors:
-            self._print_message(message, self.error_prefix)
+        # create the config object
+        parser = ConfigParser.RawConfigParser()
 
-    def warning(self, message):
-        """Prints the specified warning message
+        # first of all, parse the default configuration
+        parser.read(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + \
+        "config" + os.path.sep + "config.default")
 
-        :param message: warning message to print
-        """
+        # next, parse the user-defined configuration if present
+        if config_path:
+            parser.read(config_path)
 
-        # print only if allowed
-        if self.print_warnings:
-            self._print_message(message, self.warning_prefix)
+        # store only the dict produced by the config parser
+        self.config = {section: dict(parser.items(section)) \
+        for section in parser.sections()}
 
-    def info(self, message):
-        """Prints the specified info message
-
-        :param message: info message to print
-        """
-
-        # print only if allowed
-        if self.print_info:
-            self._print_message(message, self.info_prefix)
-
-    def _print_message(self, message, prefix=""):
-        """Prints the specified message with an optional prefix to stdout
-
-        :param message: message to print
-        :param prefix: prefix for message
-        """
-
-        print("{0} {1}".format(prefix, message))
+        # force some types
+        self.config["server"]["port"] = int(self.config["server"]["port"])
+        self.config["server"]["max_connections"] = \
+        int(self.config["server"]["max_connections"])
+        self.config["adc"]["socket_buffer_length"] = \
+        int(self.config["adc"]["socket_buffer_length"])
+        self.config["adc"]["max_adc_connection_attempts"] = \
+        int(self.config["adc"]["max_adc_connection_attempts"])
+        self.config["adc"]["min_adc_reconnection_delay"] = \
+        float(self.config["adc"]["min_adc_reconnection_delay"])
+        self.config["adc"]["hrdl_string_buffer_length"] = \
+        int(self.config["adc"]["hrdl_string_buffer_length"])
+        self.config["adc"]["hrdl_sample_buffer_length"] = \
+        int(self.config["adc"]["hrdl_sample_buffer_length"])
+        self.config["datastore"]["max_readings"] = \
+        int(self.config["datastore"]["max_readings"])
 
     def parse_channel_config(self, channel_config_path):
         """Parses the channel configuration found in the specified path
@@ -170,32 +159,32 @@ class Server(object):
         :param channel_config_path: path to channel configuration file
         """
 
-        self.info("Parsing channel config")
-
-        # create channel config dict
-        self.channel_config = {}
-
-        # tell user if there are no active channels
-        if channel_config_path is None:
-            # no channels to parse
-            self.warning("No channels are active. Cowardly carrying on.")
-
-            return
+        self.logger.info("Parsing channel config")
 
         # instantiate parser
-        parser = ConfigParser.RawConfigParser(self.default_channel_config)
+        parser = ConfigParser.RawConfigParser()
 
-        # parse
-        parser.read(channel_config_path)
+        # first of all, parse the default configuration
+        parser.read(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + \
+        "config" + os.path.sep + "channel_config.default")
 
-        # save config sections as channels
-        self.channel_config = parser.sections()
+        # next, parse the user-defined configuration if present
+        if channel_config_path:
+            parser.read(channel_config_path)
+        else:
+            # no user-defined channel settings
+            self.logger.warning("No user-defined channel configuration found. \
+Cowardly carrying on.")
+
+        # store only the dict produced by the config parser
+        self.channel_config = {section: dict(parser.items(section)) \
+        for section in parser.sections()}
 
     def compile_regex(self):
         """Compiles built-in regex strings into Python regular expression \
         objects"""
 
-        self.info("Compiling regex handlers")
+        self.logger.info("Compiling regex handlers")
 
         # create dict if not yet created
         if self.regex_objects is None:
@@ -209,13 +198,16 @@ class Server(object):
         """Opens a connection to the ADC and binds the server to the \
         preconfigured socket"""
 
-        self.info("Starting server")
+        self.logger.info("Starting server")
 
         # open ADC
         self._open_adc()
 
         # configure ADC
         self._configure_adc()
+
+        # start ADC recording
+        self._stream_adc()
 
         # bind to socket
         self._bind()
@@ -228,6 +220,9 @@ class Server(object):
 
         # clients list
         self._clients = []
+
+        # let user know how to stop server
+        print("Press return to stop server", file=sys.stdout)
 
         # main run loop
         while self.server_running:
@@ -252,10 +247,32 @@ class Server(object):
                     # an input has been detected on stdin, so stop server
                     self.server_running = False
 
+        # stop server
         self.stop()
+
+    def _stream_adc(self):
+        """Starts the ADC in stream (continuous measurement) mode
+
+        Also records the timestamp corresponding to the start of the stream.
+        """
+
+        # create a new datastore
+        self.datastore = DataStore(self.config["datastore"]["max_readings"])
+
+        # create a new data retriever
+        self._retriever = Retriever(self._adc, self.datastore)
+
+        # start retrieval thread
+        self._retriever.start()
+
+        # record the current timestamp
+        self.stream_start_timestamp = self.get_timestamp()
 
     def stop(self):
         """Closes all open connections, including to the ADC"""
+
+        # stop ADC streaming
+        self._retriever.stop()
 
         # close clients
         self._close_clients()
@@ -266,7 +283,7 @@ class Server(object):
         # close ADC
         self._close_adc()
 
-        self.info("Bye")
+        self.logger.info("Bye")
 
     def _close_clients(self):
         """Closes client connections"""
@@ -289,7 +306,9 @@ class Server(object):
         """Opens the ADC as many times as necessary"""
 
         # ADC object
-        adc = PicoLogAdc()
+        adc = PicoLogAdc(self.config["adc"]["hrdl_library_path"], \
+        self.config["adc"]["hrdl_string_buffer_length"], \
+        self.config["adc"]["hrdl_sample_buffer_length"], logger=self.logger)
 
         # connection attempts
         attempts = 0
@@ -309,14 +328,15 @@ class Server(object):
                 # ADC reported issue
 
                 # check if we're out of attempts
-                if attempts >= self.max_adc_connection_attempts:
+                if attempts >= self.config["adc"]["max_adc_connection_attempts"]:
                     raise Exception("Could not open ADC after {0} attempt(s). \
 Last error: {1}".format(attempts, e))
 
             # wait exponentially longer than last time
-            delay = self.min_adc_reconnection_delay * attempts ** 2
+            delay = self.config["adc"]["min_adc_reconnection_delay"] \
+            * attempts ** 2
 
-            self.warning("Could not connect to ADC. Waiting {0}s before next \
+            self.logger.warning("Could not connect to ADC. Waiting {0}s before next \
 attempt".format(delay))
 
             time.sleep(delay)
@@ -339,15 +359,17 @@ attempt".format(delay))
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # bind the socket to the preconfigured host and port
-        self._socket.bind((self.host, self.port))
+        self._socket.bind((self.config["server"]["host"], \
+        self.config["server"]["port"]))
 
-        self.info("Server bound to {0} on port {1}".format(self.host, self.port))
+        self.logger.info("Server bound to {0} on port {1}".format( \
+        self.config["server"]["host"], self.config["server"]["port"]))
 
     def _listen(self):
         """Starts listening to the socket for a connection"""
 
         # listen for connections up to the preconfigured maximum
-        self._socket.listen(self.max_connections)
+        self._socket.listen(self.config["server"]["max_connections"])
 
     def socket_open(self):
         """Checks if socket is open"""
@@ -373,13 +395,14 @@ class Client(threading.Thread):
         self.connection = connection
         self.address = address
 
-        self.info("Connection {0} from {1}".format(connection, address))
+        self.server.logger.info("Connection from {0}".format(address))
 
     def run(self):
         """Runs the client thread"""
 
         # receive message
-        data = self.connection.recv(self.server.socket_buffer_length)
+        data = self.connection.recv( \
+        self.server.config["adc"]["socket_buffer_length"])
 
         self._handle(data)
 
@@ -392,18 +415,21 @@ class Client(threading.Thread):
         :param data: data sent by client
         """
 
-        self.info("Received data: {0}".format(data))
+        self.server.logger.info("Received message: {0}".format(data))
 
         try:
             if data == self.server.command["timestamp"]:
                 self._send_timestamp()
-            elif data.startswith(self.server.command["datasince"]):
-                self._handle_command_data_since(data)
+            elif data == self.server.command["streamstarttimestamp"]:
+                self._send_stream_start_timestamp()
+            elif data.startswith(self.server.command["dataafter"]):
+                self._handle_command_data_after(data)
         except Exception, e:
-            self._send_error_message(e)
+            self._send_error_message(str(e))
 
-        print("Closing connection")
         self.connection.close()
+
+        self.server.logger.info("Connection closed")
 
     def _send_error_message(self, message):
         """Sends the client the specified error message
@@ -411,22 +437,24 @@ class Client(threading.Thread):
         :param message: error message
         """
 
-        self.connection.send("{0} {1}".format(self.server.error_prefix, message))
+        self.connection.send(message)
 
     def _send_timestamp(self):
-        """Sends the current timestamp to the connected client
-
-        """
-        self.info("Sending timestamp")
+        """Sends the current timestamp to the connected client"""
+        self.server.logger.info("Sending timestamp")
         self.connection.send(str(self.server.get_timestamp()))
 
-    def _handle_command_data_since(self, data):
-        """Handles a 'datasince' command
+    def _send_stream_start_timestamp(self):
+        """Sends the stream start timestamp to the connected client"""
+        self.server.logger.info("Sending stream start timestamp")
+        self.connection.send(str(self.server.stream_start_timestamp))
 
-        The command should be "datasince <timestamp>" where <timestamp> is a
-        valid UNIX timestamp in milliseconds. It must meet certain length
-        criteria as defined in the regex expression the timestamp is checked
-        against. If the specified timestamp is invalid, an exception is raised.
+    def _handle_command_data_after(self, data):
+        """Handles a 'dataafter' command
+
+        The command should be "dataafter <time>" where <time> is a
+        valid time in milliseconds. If the specified timestamp is invalid, an \
+        exception is raised.
 
         :param data: data sent by client
         :raises Exception: if timestamp is invalid
@@ -444,23 +472,12 @@ class Client(threading.Thread):
         timestamp = int(search.group(1))
 
         # send the data
-        self._send_data_since(timestamp)
+        self._send_data_after(timestamp)
 
-    def _send_data_since(self, timestamp):
+    def _send_data_after(self, timestamp):
         """Sends the data collected since the specified timestamp
 
         :param timestamp: timestamp to send data since
-        :raises Exception: if timestamp is too far in the past
         """
 
-        self.connection.send("data since {0}".format(timestamp))
-
-if __name__ == "__main__":
-    server = Server(*sys.argv[1:])
-
-    try:
-        server.start()
-    except:
-        if server.socket_open():
-            server.stop()
-        raise
+        self.connection.send(self.server.datastore.find_readings_after(timestamp))

@@ -1,0 +1,5 @@
+[Channel 1]
+channel = 1
+enabled = false
+range = 0
+type = 1

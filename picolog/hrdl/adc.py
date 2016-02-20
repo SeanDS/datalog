@@ -32,78 +32,30 @@ class PicoLogAdc(object):
     """Handle representing the PicoLog unit in communication"""
     handle = None
 
+    """Total time required to collect samples of enabled channels"""
+    sample_time = None
+
     """Enabled channels set"""
     enabled_channels = set()
 
     """Channel voltage settings (using VoltageRange constants)"""
     channel_voltages = {}
 
-    def __init__(self, log_info=None, log_error=sys.stderr):
+    def __init__(self, library_path, string_buffer_length, sample_buffer_length, \
+    logger=None):
         """Initialises the PicoLog ADC interface
-
-        :param log_info:
-
         """
 
-        # create logger
-        self.logger = logging.getLogger('PicoLog-ADC')
-        self.logger.setLevel(logging.INFO)
-
-        # set OS-specific logging black hole if necessary
-        if log_info is None:
-            log_info = open(os.devnull, "w")
-
-        # create stream handler for info
-        info_handler = logging.StreamHandler(log_info)
-        info_handler.setLevel(logging.INFO)
-
-        # create stream handler for errors
-        error_handler = logging.StreamHandler(log_error)
-        error_handler.setLevel(logging.ERROR)
-
-        # create formatter
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        info_handler.setFormatter(formatter)
-        error_handler.setFormatter(formatter)
-
-        # add stream handlers to logger
-        self.logger.addHandler(info_handler)
-        self.logger.addHandler(error_handler)
-
-        # load configuration
-        self.load_config()
+        # set parameters
+        self.library_path = library_path
+        self.string_buffer_length = string_buffer_length
+        self.sample_buffer_length = sample_buffer_length
+        self.logger = logger
 
         # load ADC library
-        self.load_library()
+        self._load_library()
 
-    def load_config(self):
-        """Loads configuration options from environment"""
-
-        self.logger.info("Loading configuration")
-
-        # path to PicoLog HRDL driver
-        self.library_path = os.getenv('PICOLOG_HRDL_DRIVER_PATH', \
-        '/opt/picoscope/lib/libpicohrdl.so')
-
-        # string buffer length
-        self.string_buffer_length = \
-        os.getenv('PICOLOG_HRDL_STRING_BUFFER_LENGTH', 1000)
-
-        # check validity of string buffer length
-        if self.string_buffer_length <= 0:
-            raise Exception("String buffer length must be positive")
-
-        # sample buffer length
-        self.sample_buffer_length = \
-        os.getenv('PICOLOG_HRDL_SAMPLE_BUFFER_LENGTH', 10)
-
-        # check validity of sample buffer length
-        if self.sample_buffer_length <= 0:
-            raise Exception("Sample buffer length must be positive")
-
-        self.logger.info("Configuration loaded successfully")
-
-    def load_library(self):
+    def _load_library(self):
         """Loads the PicoLog library"""
 
         self.logger.info("Loading ADC driver")
@@ -151,7 +103,7 @@ operation in progress")
 
         while True:
             # get progress
-            (status, progress) = self.get_open_unit_progress_status()
+            (status, progress) = self._get_open_unit_progress_status()
 
             if status is Progress.OPEN_PROGRESS_PENDING:
                 print(".", end="", file=stream)
@@ -174,7 +126,7 @@ operation in progress")
             else:
                 raise Exception("Unit open failure")
 
-    def get_open_unit_progress_status(self):
+    def _get_open_unit_progress_status(self):
         """Fetches the current unit open progress status
 
         :return: unit open status and percentage progress
@@ -405,7 +357,8 @@ channel is not possible. Instead set the input on the primary channel number.")
         # set the channel voltage dict
         self.channel_voltages[channel] = vrange
 
-        self.logger.info("Analog input channel set successfully")
+        self.logger.info("Analog input channel {0} set to enabled={1}, \
+vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
     def set_sample_time(self, sample_time, conversion_time):
         """Sets the time the unit can take to sample all active inputs.
@@ -439,7 +392,11 @@ channel is not possible. Instead set the input on the primary channel number.")
             # setting failure
             self.raise_unit_settings_error()
 
-        self.logger.info("Sample and conversion times set successfully")
+        # save sample time
+        self.sample_time = sample_time
+
+        self.logger.info("Sample time set to {0}, conversion time set to \
+{1}".format(sample_time, conversion_time))
 
     def stream(self):
         """Streams data from the unit"""
