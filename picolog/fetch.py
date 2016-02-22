@@ -16,6 +16,12 @@ class Retriever(threading.Thread):
     retrieving = None
 
     def __init__(self, adc, datastore):
+        """Initialises the retriever
+
+        :param adc: the ADC object to retrieve data from
+        :param datastore: the datastore to store data in
+        """
+
         # call thread init
         threading.Thread.__init__(self)
 

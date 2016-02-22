@@ -105,7 +105,11 @@ class DataStore(object):
     readings = None
 
     def __init__(self, max_readings):
-        """Initialises the datastore"""
+        """Initialises the datastore
+
+        :param max_readings: the maximum number of readings to hold in the \
+        datastore
+        """
 
         # set parameters
         self.max_readings = max_readings

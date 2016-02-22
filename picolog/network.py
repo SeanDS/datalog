@@ -90,7 +90,11 @@ class Server(object):
         self.logger.info("Server ready to be started")
 
     def _create_logger(self, info_stream, error_stream):
-        """Creates a logger using the specified streams"""
+        """Creates a logger using the specified streams
+
+        :param info_stream: the stream to post information to
+        :param error_stream: the stream to post errors to
+        """
 
         # create logger instance
         self.logger = logging.getLogger('PicoLogServer')
@@ -201,13 +205,13 @@ Cowardly carrying on.")
         self.logger.info("Starting server")
 
         # open ADC
-        #self._open_adc()
+        self._open_adc()
 
         # configure ADC
-        #self._configure_adc()
+        self._configure_adc()
 
         # start ADC recording
-        #self._stream_adc()
+        self._stream_adc()
 
         # bind to socket
         self._bind()
@@ -272,7 +276,7 @@ Cowardly carrying on.")
         """Closes all open connections, including to the ADC"""
 
         # stop ADC streaming
-        #self._retriever.stop()
+        self._retriever.stop()
 
         # close clients
         self._close_clients()
@@ -281,7 +285,7 @@ Cowardly carrying on.")
         self._socket.close()
 
         # close ADC
-        #self._close_adc()
+        self._close_adc()
 
         self.logger.info("Bye")
 
@@ -388,6 +392,13 @@ class Client(threading.Thread):
     address = None
 
     def __init__(self, server, connection, address):
+        """Initialises the client
+
+        :param server: the server this client is connected to
+        :param connection: the connection object to send/receive commands
+        :param address: the address of the client
+        """
+
         # call thread init
         threading.Thread.__init__(self)
 
@@ -415,18 +426,19 @@ class Client(threading.Thread):
         :param data: data sent by client
         """
 
-        self.server.logger.info("Received message: {0}".format(data))
+        self.server.logger.info("Received message: \"{0}\"".format(data))
 
         try:
             if data == self.server.command["timestamp"]:
                 self._send_timestamp()
+            elif data == self.server.command["sampletime"]:
+                self._send_adc_sample_time()
             elif data == self.server.command["streamstarttimestamp"]:
                 self._send_stream_start_timestamp()
             elif data.startswith(self.server.command["dataafter"]):
                 self._handle_command_data_after(data)
-            elif data == self.server.command["sampletime"]:
-                self._send_adc_sample_time()
         except Exception, e:
+            self.server.logger.error(str(e))
             self._send_error_message(str(e))
 
         self.connection.close()
@@ -503,7 +515,12 @@ class ServerSocket(object):
     buffer = None
 
     def __init__(self, host, port, buffer=1000):
-        """Initialises the socket server"""
+        """Initialises the socket server
+
+        :param host: the host to connect to
+        :param port: the port to connect to
+        :param buffer: the buffer length to use to receive server responses
+        """
 
         # set parameters
         self.host = host
