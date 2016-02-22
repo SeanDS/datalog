@@ -47,7 +47,7 @@ class Server(object):
 
     """Command strings"""
     command = {"timestamp": "timestamp", "dataafter": "dataafter", \
-    "streamstarttimestamp": "streamstarttimestamp"}
+    "streamstarttimestamp": "streamstarttimestamp", "sampletime": "sampletime"}
 
     """Regular expressions"""
     regex = {"dataafter": "dataafter.*?(\\d{1,})"}
@@ -201,13 +201,13 @@ Cowardly carrying on.")
         self.logger.info("Starting server")
 
         # open ADC
-        self._open_adc()
+        #self._open_adc()
 
         # configure ADC
-        self._configure_adc()
+        #self._configure_adc()
 
         # start ADC recording
-        self._stream_adc()
+        #self._stream_adc()
 
         # bind to socket
         self._bind()
@@ -272,7 +272,7 @@ Cowardly carrying on.")
         """Closes all open connections, including to the ADC"""
 
         # stop ADC streaming
-        self._retriever.stop()
+        #self._retriever.stop()
 
         # close clients
         self._close_clients()
@@ -281,7 +281,7 @@ Cowardly carrying on.")
         self._socket.close()
 
         # close ADC
-        self._close_adc()
+        #self._close_adc()
 
         self.logger.info("Bye")
 
@@ -424,6 +424,8 @@ class Client(threading.Thread):
                 self._send_stream_start_timestamp()
             elif data.startswith(self.server.command["dataafter"]):
                 self._handle_command_data_after(data)
+            elif data == self.server.command["sampletime"]:
+                self._send_adc_sample_time()
         except Exception, e:
             self._send_error_message(str(e))
 
@@ -449,6 +451,11 @@ class Client(threading.Thread):
         self.server.logger.info("Sending stream start timestamp")
         self.connection.send(str(self.server.stream_start_timestamp))
 
+    def _send_adc_sample_time(self):
+        """Sends the ADC sample time"""
+        self.server.logger.info("Sending ADC sample time")
+        self.connection.send(str(self.server._adc.sample_time))
+
     def _handle_command_data_after(self, data):
         """Handles a 'dataafter' command
 
@@ -462,7 +469,7 @@ class Client(threading.Thread):
 
         # match timestamp in data
         search = self.server.regex_objects[\
-        self.server.command["datasince"]].search(data)
+        self.server.command["dataafter"]].search(data)
 
         # if no matches, raise exception
         if search is None:
@@ -480,4 +487,57 @@ class Client(threading.Thread):
         :param timestamp: timestamp to send data since
         """
 
-        self.connection.send(self.server.datastore.find_readings_after(timestamp))
+        self.connection.send( \
+        self.server.datastore.find_readings_after(timestamp).csv_repr())
+
+class ServerSocket(object):
+    """Provides a socket interface to the ADC server."""
+
+    """Host"""
+    host = None
+
+    """Port"""
+    port = None
+
+    """Response receive buffer size"""
+    buffer = None
+
+    def __init__(self, host, port, buffer=1000):
+        """Initialises the socket server"""
+
+        # set parameters
+        self.host = host
+        self.port = port
+        self.buffer = buffer
+
+    def get_connection(self):
+        """Returns a new connection to the server"""
+
+        # get socket
+        s = self.get_socket()
+
+        # connect using preconfigured host and port
+        s.connect((self.host, self.port))
+
+        return s
+
+    def get_socket(self):
+        """Returns a new socket for internet communication"""
+
+        return socket.socket()
+
+    def get_command_response(self, command):
+        """Connects to the server, sends it the specified command and returns \
+        the response
+
+        :param command: the command to send to the server
+        """
+
+        # get connection
+        connection = self.get_connection()
+
+        # send command
+        connection.send(command)
+
+        # return response
+        return connection.recv(self.buffer)

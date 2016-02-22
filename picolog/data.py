@@ -47,6 +47,25 @@ specified samples")
         for (this_channel, this_sample) in zip(channels, samples):
             self.samples.append(Sample(this_channel, this_sample))
 
+    def __repr__(self):
+        """String representation of this reading"""
+        return self.csv_repr()
+
+    def csv_repr(self):
+        """CSV representation of this reading"""
+        return ",".join(self.list_repr())
+
+    def list_repr(self):
+        """List representation of this reading"""
+
+        # reading time
+        str = [self.reading_time]
+
+        # samples
+        str.extend([sample.value for sample in self.samples])
+
+        return str
+
 class Sample(object):
     """Class to represent a single sample of a single channel."""
 
@@ -71,6 +90,11 @@ class Sample(object):
 
         self.value = value
 
+    def __repr__(self):
+        """String representation of this sample"""
+
+        return "Channel {0} value: {1}".format(self.channel, self.value)
+
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
 
@@ -88,6 +112,33 @@ class DataStore(object):
 
         # initialise list of readings
         self.readings = []
+
+    def instance_with_readings(self, readings):
+        """Returns a new instance of datastore with the specified readings
+
+        :param readings: list of readings
+        """
+
+        # new object
+        obj = self.__class__(self.max_readings)
+
+        # set readings
+        obj.insert(readings)
+
+        # return
+        return obj
+
+    def __repr__(self):
+        """String representation of this datastore"""
+        return self.csv_repr()
+
+    def csv_repr(self):
+        """CSV representation of this datastore"""
+        return "\n".join([reading.csv_repr() for reading in self.readings])
+
+    def list_repr(self):
+        """List representation of this datastore"""
+        return [reading.csv_repr() for reading in self.readings]
 
     def insert(self, readings):
         """Inserts the specified readings into the datastore
@@ -123,21 +174,21 @@ reading time")
         if reading.reading_time == timestamp), None)
 
     def find_readings_after(self, timestamp):
-        """Returns the readings after the specified time
+        """Returns a new datastore containing readings after the specified time
 
         :param timestamp: the timestamp to find readings after
         """
 
-        # return readings with timestamp >= specified timestamp
-        return [reading for reading in self.readings if reading.reading_time \
-        >= timestamp]
+        # return new datastore containing readings with timestamp >= specified timestamp
+        return self.instance_with_readings([reading for reading in self.readings \
+        if reading.reading_time >= timestamp])
 
     def find_readings_before(self, timestamp):
-        """Returns the readings before the specified time
+        """Returns a new datastore containing readings before the specified time
 
         :param timestamp: the timestamp to find readings before
         """
 
-        # return readings with timestamp < specified timestamp
-        return [reading for reading in self.readings if reading.reading_time \
-        < timestamp]
+        # return new datastore containing readings with timestamp < specified timestamp
+        return self.instance_with_readings([reading for reading in self.readings \
+        if reading.reading_time < timestamp])
