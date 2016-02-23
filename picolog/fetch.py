@@ -45,7 +45,7 @@ class Retriever(threading.Thread):
                     self._datastore.insert(readings)
 
             # wait until next samples should be ready
-            time.sleep(self.fetch_delay)
+            time.sleep(fetch_delay)
 
     def stop(self):
         """Stops the ADC data stream"""
