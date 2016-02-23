@@ -53,7 +53,7 @@ class PicoLogAdc(object):
         
         # make black hole logger if necessary
         if logger is None:
-            logger = os.devnull
+            logger = open(os.devnull, "w")
         
         self.logger = logger
 
