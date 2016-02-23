@@ -15,7 +15,7 @@ def print_usage():
     """Prints usage instructions"""
 
     # print instructions
-    print("Usage: python datastream.py <host> <port>")
+    print("Usage: python stream-from-server.py <host> <port>")
 
     # exit program
     exit(0)
