@@ -45,7 +45,7 @@ class Retriever(threading.Thread):
                 readings = self._adc.get_readings()
 
                 # make sure readings aren't empty
-                if readings:
+                if len(readings) > 0:
                     # store data
                     self._datastore.insert(readings)
 

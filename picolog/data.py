@@ -150,9 +150,7 @@ class DataStore(object):
         """
 
         # add each reading, but check it is a later timestamp than the last
-        for reading in readings:
-            print(reading)
-            
+        for reading in readings:            
             # check the reading time is latest
             if len(self.readings) > 0:
                 if reading.reading_time <= self.readings[-1].reading_time:
