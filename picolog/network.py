@@ -443,9 +443,7 @@ class Client(threading.Thread):
             elif data == self.server.command["sampletime"]:
                 self._send_adc_sample_time()
         except Exception, e:
-            # FIXME: temporarily throw exception
-            raise
-            #self._send_error_message(str(e))
+            self._send_error_message("Error: {0}".format(str(e)))
 
         self.connection.close()
 
@@ -520,13 +518,13 @@ class ServerSocket(object):
     """Response receive buffer size"""
     buffer = None
 
-    def __init__(self, host, port, buffer=1000):
+    def __init__(self, host, port, buffer_length=1000):
         """Initialises the socket server"""
 
         # set parameters
         self.host = host
         self.port = port
-        self.buffer = buffer
+        self.buffer_length = buffer_length
 
     def get_connection(self):
         """Returns a new connection to the server"""
@@ -558,4 +556,4 @@ class ServerSocket(object):
         connection.send(command)
 
         # return response
-        return connection.recv(self.buffer)
+        return connection.recv(self.buffer_length)
