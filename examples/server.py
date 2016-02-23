@@ -13,6 +13,7 @@ try:
     # start server
     server.start()
 except:
+    server._adc.close_unit()
     # close open sockets if necessary
     if server.socket_open():
         server.stop()
