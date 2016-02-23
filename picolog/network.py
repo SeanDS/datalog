@@ -14,7 +14,7 @@ from picolog.hrdl.adc import PicoLogAdc
 from picolog.fetch import Retriever
 from picolog.data import DataStore
 from picolog.logstream import LevelBasedHandler
-from picolog.constants import Channel, VoltageRange, InputType
+from picolog.constants import Channel, VoltageRange, InputType, ConversionTime
 
 """
 ADC networking tools.
@@ -358,8 +358,12 @@ attempt".format(delay))
             self._adc.set_analog_in_channel(int(channel["channel"]), \
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
         
-        # calculate sample time, just num. channels * conversion time
-        sample_time = self._adc.get_enabled_channels_count() * self.config["adc"]["conversion_time"]
+        # calculate sample time in ms, just num. channels * conversion time
+        sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"])
+        
+        print(self._adc.get_enabled_channels_count())
+        print(sample_time)
+        print(self.config["adc"]["conversion_time"])
         
         # set sample time
         self._adc.set_sample_time(sample_time, self.config["adc"]["conversion_time"])
