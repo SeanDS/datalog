@@ -440,12 +440,16 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         # empty list of readings
         readings = []
+        
+        if times and samples:
+            readings.append(Reading(times[0], self.enabled_channels, samples))
+
 
         # iterate over individual readings
-        for (reading_time, reading_samples) in zip(times, samples):
-            # add new reading to list
-            readings.append(Reading(reading_time, self.enabled_channels, \
-            reading_samples))
+        #for (reading_time, reading_samples) in zip(times, samples):
+        #    # add new reading to list
+        #    readings.append(Reading(reading_time, self.enabled_channels, \
+        #    reading_samples))
 
         return readings
 
