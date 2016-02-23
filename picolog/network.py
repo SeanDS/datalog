@@ -358,8 +358,8 @@ attempt".format(delay))
             self._adc.set_analog_in_channel(int(channel["channel"]), \
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
         
-        # calculate sample time in ms, just num. channels * conversion time
-        sample_time = len(self._adc.enabled_channels) * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"])
+        # calculate sample time in ms, just num. channels * conversion time, plus 1ms
+        sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"]) + 1
         
         print(len(self._adc.enabled_channels))
         print(self._adc.get_enabled_channels_count())
