@@ -359,8 +359,9 @@ attempt".format(delay))
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
         
         # calculate sample time in ms, just num. channels * conversion time
-        sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"])
+        sample_time = len(self._adc.enabled_channels) * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"])
         
+        print(len(self._adc.enabled_channels))
         print(self._adc.get_enabled_channels_count())
         print(sample_time)
         print(self.config["adc"]["conversion_time"])
