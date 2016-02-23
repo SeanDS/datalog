@@ -1,3 +1,5 @@
+from __future__ import division
+
 import time
 import threading
 
@@ -27,7 +29,7 @@ class Retriever(threading.Thread):
         """Starts streaming data from the ADC"""
 
         # calculate the fetch delay, just a bit longer than the total sample time
-        fetch_delay = self._adc.sample_time + 0.001 # 1ms delay
+        fetch_delay = (self._adc.sample_time + 0.001) / 1000 # 1ms delay
 
         # set status on
         self.retrieving = True
