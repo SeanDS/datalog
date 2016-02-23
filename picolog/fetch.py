@@ -25,7 +25,7 @@ class Retriever(threading.Thread):
         self._adc = adc
         self._datastore = datastore
 
-    def start(self):
+    def run(self):
         """Starts streaming data from the ADC"""
 
         # calculate the fetch delay in seconds
