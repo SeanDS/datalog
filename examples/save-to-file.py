@@ -60,15 +60,15 @@ with open(sys.argv[3], "a") as f:
         data = server.get_command_response("dataafter {0}".format(timestamp))
 
         # convert data to CSV
-        csv = convert_to_list(data)
+        datalist = convert_to_list(data)
 
         # check if we have data
-        if len(csv) > 0:
+        if len(datalist) > 0:
             # update timestamp
-            timestamp = csv[-1][0]
+            timestamp = datalist[-1][0]
             
-            # write to file
-            f.writelines(csv)
+            # write data to file
+            f.write(data + "\n")
 
         # sleep for one reading
         time.sleep(sleep_time)
