@@ -349,8 +349,8 @@ attempt".format(delay))
 
         # activate channels
         for channel in self.channel_config:
-            self._adc.set_analog_in_channel(channel["channel"], \
-            channel["enabled"], channel["range"], channel["type"])
+            self._adc.set_analog_in_channel(int(channel["channel"]), \
+            bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
