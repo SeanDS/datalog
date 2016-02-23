@@ -12,6 +12,7 @@ import ConfigParser
 
 from picolog.hrdl.adc import PicoLogAdc
 from picolog.fetch import Retriever
+from picolog.data import DataStore
 from picolog.logstream import LevelBasedHandler
 from picolog.constants import Channel, VoltageRange, InputType
 
@@ -140,6 +141,8 @@ class Server(object):
         self.config["server"]["port"] = int(self.config["server"]["port"])
         self.config["server"]["max_connections"] = \
         int(self.config["server"]["max_connections"])
+        self.config["adc"]["conversion_time"] = \
+        int(self.config["adc"]["conversion_time"])
         self.config["adc"]["socket_buffer_length"] = \
         int(self.config["adc"]["socket_buffer_length"])
         self.config["adc"]["max_adc_connection_attempts"] = \
@@ -348,9 +351,18 @@ attempt".format(delay))
         """Configures the ADC using preconfigured settings"""
 
         # activate channels
-        for channel in self.channel_config:
+        for index in self.channel_config:
+            # get channel dict
+            channel = self.channel_config[index]
+            
             self._adc.set_analog_in_channel(int(channel["channel"]), \
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
+        
+        # calculate sample time, just num. channels * conversion time
+        sample_time = self._adc.get_enabled_channels_count() * self.config["adc"]["conversion_time"]
+        
+        # set sample time
+        self._adc.set_sample_time(sample_time, self.config["adc"]["conversion_time"])
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
