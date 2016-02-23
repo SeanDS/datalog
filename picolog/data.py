@@ -152,9 +152,13 @@ class DataStore(object):
         """
 
         # add each reading, but check it is a later timestamp than the last
-        for reading in readings:            
+        for reading in readings:
+            # check if reading is not valid - reading is zero and samples are zero
+            if reading.reading_time == 0 and not any([sample for sample in reading.samples if sample.value != 0]):
+                continue
+            
             # check the reading time is latest
-            if len(self.readings) > 0:
+            if len(self.readings) > 0:                
                 if reading.reading_time <= self.readings[-1].reading_time:
                     raise Exception("A new reading time is earlier than an existing \
 reading time")

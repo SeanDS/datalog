@@ -441,14 +441,9 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         # empty list of readings
         readings = []
         
-        if times and samples:
-            readings.append(Reading(times[0], self.enabled_channels, samples))
-
-        # iterate over individual readings
-        #for (reading_time, reading_samples) in zip(times, samples):
-        #    # add new reading to list
-        #    readings.append(Reading(reading_time, self.enabled_channels, \
-        #    reading_samples))
+        # loop over times, adding readings
+        for time, data in zip(times, samples):
+            readings.append(Reading(time, self.enabled_channels, data))
 
         return readings
 
@@ -456,10 +451,10 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         """Fetches uncollected sample payload from the unit"""
 
         # create C long times array
-        times = (ctypes.c_long * self.sample_buffer_length)()
+        raw_times = (ctypes.c_long * self.sample_buffer_length)()
 
         # create C long values array
-        samples = (ctypes.c_long * self.sample_buffer_length)()
+        raw_samples = (ctypes.c_long * self.sample_buffer_length)()
 
         # calculate number of values to collect for each channel
         samples_per_channel = self.sample_buffer_length // \
@@ -467,23 +462,38 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         # get samples, without using the overflow short parameter (None == NULL)
         num_values = ctypes.c_long( \
-        self.library.HRDLGetTimesAndValues(self.handle, ctypes.pointer(times), \
-        ctypes.pointer(samples), None, ctypes.c_long(samples_per_channel)))
+        self.library.HRDLGetTimesAndValues(self.handle, ctypes.pointer(raw_times), \
+        ctypes.pointer(raw_samples), None, ctypes.c_long(samples_per_channel)))
 
         # check return status
         if num_values is 0:
             raise Exception("Call failed or no values available")
 
         # convert times and values into Python lists
-        times = self._sample_array_to_list(times)
-        samples = self._sample_array_to_list(samples)
+        raw_times = self._sample_array_to_list(raw_times)
+        raw_samples = self._sample_array_to_list(raw_samples)
 
-        # collect indices corresponding to non-zero times
-        time_indices = [i for i, e in enumerate(times) if e is not 0]
-        sample_indices = [i for i, e in enumerate(samples) if e is not 0]
+        # empty lists for cleaned up times and samples
+        times = []
+        samples = []
+        
+        # number of active channels
+        channel_count = len(self.enabled_channels)
+
+        # loop over at least the first entry (it can be zero, next entries cannot be)
+        for i in range(len(raw_times)):
+            # break when first non-zero time after first is found
+            if i > 0 and raw_times[i] == 0:
+                break
+            
+            # add time to list
+            times.append(raw_times[i])
+            
+            # add next x samples (where x is the number of channels)
+            samples.append(raw_samples[i:i+channel_count])
 
         # return times and values
-        return (map(times.__getitem__, time_indices), map(samples.__getitem__, sample_indices))
+        return (times, samples)
 
     def _sample_array_to_list(self, data_array):
         """Converts a C type samples array into a Python list
