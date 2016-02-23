@@ -361,11 +361,6 @@ attempt".format(delay))
         # calculate sample time in ms, just num. channels * conversion time, plus 1ms
         sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"]) + 1
         
-        print(len(self._adc.enabled_channels))
-        print(self._adc.get_enabled_channels_count())
-        print(sample_time)
-        print(self.config["adc"]["conversion_time"])
-        
         # set sample time
         self._adc.set_sample_time(sample_time, self.config["adc"]["conversion_time"])
 
@@ -444,7 +439,9 @@ class Client(threading.Thread):
             elif data == self.server.command["sampletime"]:
                 self._send_adc_sample_time()
         except Exception, e:
-            self._send_error_message(str(e))
+            # FIXME: temporarily throw exception
+            raise
+            #self._send_error_message(str(e))
 
         self.connection.close()
 

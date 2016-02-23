@@ -55,7 +55,9 @@ specified samples")
 
     def csv_repr(self):
         """CSV representation of this reading"""
-        return ",".join(self.list_repr())
+        
+        # convert ints to strings and join
+        return ",".join([str(item) for item in self.list_repr()])
 
     def list_repr(self):
         """List representation of this reading"""
