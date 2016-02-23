@@ -201,13 +201,13 @@ Cowardly carrying on.")
         self.logger.info("Starting server")
 
         # open ADC
-        #self._open_adc()
+        self._open_adc()
 
         # configure ADC
-        #self._configure_adc()
+        self._configure_adc()
 
         # start ADC recording
-        #self._stream_adc()
+        self._stream_adc()
 
         # bind to socket
         self._bind()
@@ -272,7 +272,7 @@ Cowardly carrying on.")
         """Closes all open connections, including to the ADC"""
 
         # stop ADC streaming
-        #self._retriever.stop()
+        self._retriever.stop()
 
         # close clients
         self._close_clients()
@@ -281,7 +281,7 @@ Cowardly carrying on.")
         self._socket.close()
 
         # close ADC
-        #self._close_adc()
+        self._close_adc()
 
         self.logger.info("Bye")
 
