@@ -50,6 +50,11 @@ class PicoLogAdc(object):
         self.library_path = library_path
         self.string_buffer_length = string_buffer_length
         self.sample_buffer_length = sample_buffer_length
+        
+        # make black hole logger if necessary
+        if logger is None:
+            logger = os.devnull
+        
         self.logger = logger
 
         # load ADC library
