@@ -42,7 +42,7 @@ class PicoLogAdc(object):
     channel_voltages = {}
 
     def __init__(self, library_path, string_buffer_length, sample_buffer_length, \
-    logger=None):
+    logger):
         """Initialises the PicoLog ADC interface
         """
 
@@ -50,11 +50,6 @@ class PicoLogAdc(object):
         self.library_path = library_path
         self.string_buffer_length = string_buffer_length
         self.sample_buffer_length = sample_buffer_length
-        
-        # make black hole logger if necessary
-        if logger is None:
-            logger = open(os.devnull, "w")
-        
         self.logger = logger
 
         # load ADC library
