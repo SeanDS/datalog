@@ -185,7 +185,7 @@ reading time")
 
         # return new datastore containing readings with timestamp >= specified timestamp
         return self.instance_with_readings([reading for reading in self.readings \
-        if reading.reading_time >= timestamp])
+        if reading.reading_time > timestamp])
 
     def find_readings_before(self, timestamp):
         """Returns a new datastore containing readings before the specified time
@@ -195,4 +195,4 @@ reading time")
 
         # return new datastore containing readings with timestamp < specified timestamp
         return self.instance_with_readings([reading for reading in self.readings \
-        if reading.reading_time < timestamp])
+        if reading.reading_time <= timestamp])

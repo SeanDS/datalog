@@ -444,7 +444,6 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         if times and samples:
             readings.append(Reading(times[0], self.enabled_channels, samples))
 
-
         # iterate over individual readings
         #for (reading_time, reading_samples) in zip(times, samples):
         #    # add new reading to list
@@ -464,9 +463,7 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         # calculate number of values to collect for each channel
         samples_per_channel = self.sample_buffer_length // \
-        self.get_enabled_channels_count()
-        # FIXME: is the call to get_enabled_channels_count (which communicates
-        # with the ADC) really necessary? Can call len(self.enabled_channels)?
+        len(self.enabled_channels)
 
         # get samples, without using the overflow short parameter (None == NULL)
         num_values = ctypes.c_long( \
@@ -482,10 +479,11 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         samples = self._sample_array_to_list(samples)
 
         # collect indices corresponding to non-zero times
-        indices = [i for i, e in enumerate(times) if e is not 0]
+        time_indices = [i for i, e in enumerate(times) if e is not 0]
+        sample_indices = [i for i, e in enumerate(samples) if e is not 0]
 
         # return times and values
-        return (map(times.__getitem__, indices), map(samples.__getitem__, indices))
+        return (map(times.__getitem__, time_indices), map(samples.__getitem__, sample_indices))
 
     def _sample_array_to_list(self, data_array):
         """Converts a C type samples array into a Python list

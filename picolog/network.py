@@ -213,7 +213,11 @@ Cowardly carrying on.")
         self._stream_adc()
 
         # bind to socket
-        self._bind()
+        try:
+            self._bind()
+        except socket.error, e:
+            # convert socket error into an exception
+            raise Exception(e)
 
         # listen for connections
         self._listen()
