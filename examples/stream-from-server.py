@@ -15,7 +15,7 @@ def print_usage():
     """Prints usage instructions"""
 
     # print instructions
-    print("Usage: python datastream.py <host> <port>")
+    print("Usage: python stream-from-server.py <host> <port>")
 
     # exit program
     exit(0)
@@ -46,8 +46,8 @@ server = ServerSocket(host, port)
 # get sample time, in ms
 sample_time = int(server.get_command_response("sampletime"))
 
-# set sleep time (sample time converted to seconds)
-sleep_time = sample_time / 1000
+# set sleep time
+sleep_time = 10
 
 # default timestamp
 timestamp = 0
@@ -57,13 +57,13 @@ while True:
     # get data
     data = server.get_command_response("dataafter {0}".format(timestamp))
 
-    print(data)
-
     # convert data to CSV
     csv = convert_to_list(data)
 
     # update timestamp with latest timestamp
-    timestamp = csv[-1][0]
+    if len(csv) > 0:
+        timestamp = csv[-1][0]
+        print(data)
 
     # sleep for one reading
     time.sleep(sleep_time)

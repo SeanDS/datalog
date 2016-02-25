@@ -5,7 +5,8 @@ max_connections = 5
 log_format = %(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 [adc]
-socket_buffer_length = 1000
+conversion_time = 3
+socket_buffer_length = 10000
 max_adc_connection_attempts = 10
 min_adc_reconnection_delay = 0.5
 hrdl_library_path = /opt/picoscope/lib/libpicohrdl.so

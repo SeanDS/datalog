@@ -12,8 +12,9 @@ import ConfigParser
 
 from picolog.hrdl.adc import PicoLogAdc
 from picolog.fetch import Retriever
+from picolog.data import DataStore
 from picolog.logstream import LevelBasedHandler
-from picolog.constants import Channel, VoltageRange, InputType
+from picolog.constants import Channel, VoltageRange, InputType, ConversionTime
 
 """
 ADC networking tools.
@@ -144,6 +145,8 @@ class Server(object):
         self.config["server"]["port"] = int(self.config["server"]["port"])
         self.config["server"]["max_connections"] = \
         int(self.config["server"]["max_connections"])
+        self.config["adc"]["conversion_time"] = \
+        int(self.config["adc"]["conversion_time"])
         self.config["adc"]["socket_buffer_length"] = \
         int(self.config["adc"]["socket_buffer_length"])
         self.config["adc"]["max_adc_connection_attempts"] = \
@@ -214,7 +217,11 @@ Cowardly carrying on.")
         self._stream_adc()
 
         # bind to socket
-        self._bind()
+        try:
+            self._bind()
+        except socket.error, e:
+            # convert socket error into an exception
+            raise Exception(e)
 
         # listen for connections
         self._listen()
@@ -352,9 +359,18 @@ attempt".format(delay))
         """Configures the ADC using preconfigured settings"""
 
         # activate channels
-        for channel in self.channel_config:
-            self._adc.set_analog_in_channel(channel["channel"], \
-            channel["enabled"], channel["range"], channel["type"])
+        for index in self.channel_config:
+            # get channel dict
+            channel = self.channel_config[index]
+            
+            self._adc.set_analog_in_channel(int(channel["channel"]), \
+            bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
+        
+        # calculate sample time in ms, just num. channels * conversion time, plus 1ms
+        sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"]) + 1
+        
+        # set sample time
+        self._adc.set_sample_time(sample_time, self.config["adc"]["conversion_time"])
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
@@ -514,7 +530,7 @@ class ServerSocket(object):
     """Response receive buffer size"""
     buffer = None
 
-    def __init__(self, host, port, buffer=1000):
+    def __init__(self, host, port, buffer_length=1000):
         """Initialises the socket server
 
         :param host: the host to connect to
@@ -525,7 +541,7 @@ class ServerSocket(object):
         # set parameters
         self.host = host
         self.port = port
-        self.buffer = buffer
+        self.buffer_length = buffer_length
 
     def get_connection(self):
         """Returns a new connection to the server"""
@@ -557,4 +573,4 @@ class ServerSocket(object):
         connection.send(command)
 
         # return response
-        return connection.recv(self.buffer)
+        return connection.recv(self.buffer_length)

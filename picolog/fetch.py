@@ -1,3 +1,5 @@
+from __future__ import division
+
 import time
 import threading
 
@@ -29,11 +31,14 @@ class Retriever(threading.Thread):
         self._adc = adc
         self._datastore = datastore
 
-    def start(self):
+    def run(self):
         """Starts streaming data from the ADC"""
 
-        # calculate the fetch delay, just a bit longer than the total sample time
-        fetch_delay = self._adc.sample_time + 0.001 # 1ms delay
+        # calculate the fetch delay in seconds
+        fetch_delay = self._adc.sample_time / 1000
+
+        # start streaming from ADC
+        self._adc.stream()
 
         # set status on
         self.retrieving = True
@@ -43,15 +48,15 @@ class Retriever(threading.Thread):
             # check if ADC has values to retrieve
             if self._adc.ready():
                 # get readings
-                readings = adc.get_readings()
+                readings = self._adc.get_readings()
 
                 # make sure readings aren't empty
-                if readings:
+                if len(readings) > 0:
                     # store data
                     self._datastore.insert(readings)
 
             # wait until next samples should be ready
-            time.sleep(self.fetch_delay)
+            time.sleep(fetch_delay)
 
     def stop(self):
         """Stops the ADC data stream"""

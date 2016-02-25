@@ -218,12 +218,20 @@ class ConversionTime(object):
     TIME_660MS = 4
     TIME_MIN   = TIME_60MS
     TIME_MAX   = TIME_660MS
+    
+    """Conversion times in ms"""
+    times = {TIME_60MS: 60, TIME_100MS: 100, TIME_180MS: 180, TIME_340MS: 340, TIME_660MS: 660}
 
     @classmethod
     def is_valid(cls, conversion_time):
         """Checks if the specified conversion time is valid"""
         return conversion_time >= cls.TIME_MIN \
         and conversion_time <= cls.TIME_MAX
+    
+    @classmethod
+    def get_conversion_time(cls, conversion_time):
+        """Returns the conversion time in ms for the specified identifier"""
+        return cls.times[conversion_time]
 
 class SampleMethod(object):
     BLOCK  = 0
