@@ -46,7 +46,7 @@ specified samples")
         self.samples = []
 
         # store samples
-        for (this_channel, this_sample) in zip(channels, samples):
+        for this_channel, this_sample in zip(channels, samples):
             self.samples.append(Sample(this_channel, this_sample))
 
     def __repr__(self):
