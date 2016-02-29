@@ -4,6 +4,7 @@ import sys
 import time
 
 from picolog.network import ServerSocket
+from picolog.constants import Channel
 
 """
 PicoLog data printer example. Requires a running server.
@@ -33,6 +34,12 @@ def convert_to_list(csv):
 
     return data
 
+def convert_to_csv(data):
+    """Converts a list to CSV"""
+    
+    # one-liner
+    return "\n".join([",".join([str(column) for column in row]) for row in data])
+
 # get arguments
 try:
     host = sys.argv[1]
@@ -52,8 +59,16 @@ sleep_time = 10
 # default timestamp
 timestamp = 0
 
+# check buffer length is adequate
+# number of channels in ADC * length of a long int in string form + commas and newline required
+if server.buffer_length < Channel.MAX_ANALOG_CHANNEL * 11 + Channel.MAX_ANALOG_CHANNEL + 1:
+    raise Exception("The socket buffer length must be long enough to receive at least one complete reading")
+
 # open file
 with open(sys.argv[3], "a") as f:
+    # the length of the last line of the data payload
+    last_line_length = None
+    
     # now loop, printing the data received from the ADC
     while True:
         # get data
@@ -65,16 +80,25 @@ with open(sys.argv[3], "a") as f:
             datalist = convert_to_list(data)
 
             # check if we have data and it is valid
-            if datalist is not None and len(datalist) > 0:
-                # update timestamp
-                timestamp = datalist[-1][0]
-            
-                # write data to file
-                f.write(data + "\n")
-            else:
+            if datalist is None or len(datalist) == 0:
                 print("Data appears to be invalid: {0}".format(data))
+                
+                continue
+            
+            # check if buffer length has been reached
+            if len(datalist) >= 2 and len(datalist[-1]) is not len(datalist[-2]):
+                # last row doesn't have the same number of columns as second last
+                # this indicates the buffer length was reached
+                # discard last row (it will be fetched next time)
+                del(datalist[-1])
+            
+            # update timestamp
+            timestamp = datalist[-1][0]
+            
+            # write data to file
+            f.write(convert_to_csv(datalist) + "\n")
         else:
-            print("Skipped empty data from server: {0}".format(data))
+            print("Skipped empty data from server. Timestamp: {0}, received data: {1}".format(timestamp, data))
 
         # sleep for one reading
         time.sleep(sleep_time)

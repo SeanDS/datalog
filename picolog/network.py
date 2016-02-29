@@ -528,7 +528,7 @@ class ServerSocket(object):
     port = None
 
     """Response receive buffer size"""
-    buffer = None
+    buffer_length = None
 
     def __init__(self, host, port, buffer_length=1000):
         """Initialises the socket server
