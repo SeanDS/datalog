@@ -58,17 +58,23 @@ with open(sys.argv[3], "a") as f:
     while True:
         # get data
         data = server.get_command_response("dataafter {0}".format(timestamp))
+        
+        # only do something if the data is useful
+        if data is not None:
+            # convert data to CSV
+            datalist = convert_to_list(data)
 
-        # convert data to CSV
-        datalist = convert_to_list(data)
-
-        # check if we have data
-        if len(datalist) > 0:
-            # update timestamp
-            timestamp = datalist[-1][0]
+            # check if we have data and it is valid
+            if datalist is not None and len(datalist) > 0:
+                # update timestamp
+                timestamp = datalist[-1][0]
             
-            # write data to file
-            f.write(data + "\n")
+                # write data to file
+                f.write(data + "\n")
+            else:
+                print("Data appears to be invalid: {0}".format(data))
+        else:
+            print("Skipped empty data from server: {0}".format(data))
 
         # sleep for one reading
         time.sleep(sleep_time)
