@@ -64,6 +64,18 @@ timestamp = 0
 if server.buffer_length < Channel.MAX_ANALOG_CHANNEL * 11 + Channel.MAX_ANALOG_CHANNEL + 1:
     raise Exception("The socket buffer length must be long enough to receive at least one complete reading")
 
+# get enabled channels
+channels = server.get_command_response("enabledchannels").split(",")
+
+# number of enabled channels
+enabled_channels = len(channels)
+
+# get channel conversion factors
+conversion = []
+
+for channel in channels:
+    conversion.append(float(server.get_command_response("voltsconversion {0}".format(channel))))
+
 # open file
 with open(sys.argv[3], "a") as f:
     # the length of the last line of the data payload
@@ -91,6 +103,17 @@ with open(sys.argv[3], "a") as f:
                 # this indicates the buffer length was reached
                 # discard last row (it will be fetched next time)
                 del(datalist[-1])
+            
+            # loop over data, converting the counts to volts
+            for i in xrange(len(datalist)):
+                # check the length is consistent
+                if len(datalist[i]) is not enabled_channels:
+                    print("Number of samples in reading {0} is not consistent with enabled channels".format(i))
+                    
+                    continue
+                
+                # scale to volts
+                datalist[i] = [sample * factor for sample, factor in zip(datalist[i], conversion)]
             
             # update timestamp
             timestamp = datalist[-1][0]
