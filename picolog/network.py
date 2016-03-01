@@ -52,7 +52,8 @@ class Server(object):
     "voltsconversion": "voltsconversion"}
 
     """Regular expressions"""
-    regex = {"dataafter": "dataafter.*?(\\d{1,})", "voltsconversion": \ "voltsconversion.*?(\\d{1,2})"}
+    regex = {"dataafter": "dataafter.*?(\\d{1,})", \
+        "voltsconversion": "voltsconversion.*?(\\d{1,2})"}
     regex_objects = None
 
     """Timestamp corresponding to the start of a data stream"""
