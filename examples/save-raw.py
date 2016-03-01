@@ -7,16 +7,16 @@ from picolog.network import ServerSocket
 from picolog.constants import Channel
 
 """
-PicoLog data printer example. Requires a running server.
+PicoLog data logging example. Requires a running server.
 
-Run with `python datastream.py <host> <port>`
+Run with `python save-raw.py <host> <port> <path>`
 """
 
 def print_usage():
     """Prints usage instructions"""
 
     # print instructions
-    print("Usage: python save-to-file.py <host> <port>")
+    print("Usage: python save-raw.py <host> <port> <path>")
 
     # exit program
     exit(0)
