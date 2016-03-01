@@ -524,7 +524,7 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         v_max = self.get_channel_max_voltage(channel)
 
         # calculate conversion
-        return = v_max / max_counts
+        return v_max / max_counts
 
     def counts_to_volts(self, counts, channel):
         """Converts the specified counts to volts
