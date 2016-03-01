@@ -106,14 +106,17 @@ with open(sys.argv[3], "a") as f:
             
             # loop over data, converting the counts to volts
             for i in xrange(len(datalist)):
-                # check the length is consistent
-                if len(datalist[i]) is not enabled_channels:
+                # check the length is consistent (enabled_channels + 1 to include time)
+                if len(datalist[i]) is not enabled_channels + 1:
                     print("Number of samples in reading {0} is not consistent with enabled channels".format(i))
                     
                     continue
                 
                 # scale to volts
-                datalist[i] = [sample * factor for sample, factor in zip(datalist[i], conversion)]
+                readings = [int(sample) * factor for sample, factor in zip(datalist[i], conversion)]
+
+                # save the readings
+                datalist[i][1:] = readings
             
             # update timestamp
             timestamp = datalist[-1][0]
