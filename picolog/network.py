@@ -48,10 +48,11 @@ class Server(object):
 
     """Command strings"""
     command = {"timestamp": "timestamp", "dataafter": "dataafter", \
-    "streamstarttimestamp": "streamstarttimestamp", "sampletime": "sampletime"}
+    "streamstarttimestamp": "streamstarttimestamp", "sampletime": "sampletime", \
+    "voltsconversion": "voltsconversion"}
 
     """Regular expressions"""
-    regex = {"dataafter": "dataafter.*?(\\d{1,})"}
+    regex = {"dataafter": "dataafter.*?(\\d{1,})", "voltsconversion": \ "voltsconversion.*?(\\d{1,2})"}
     regex_objects = None
 
     """Timestamp corresponding to the start of a data stream"""
@@ -453,6 +454,8 @@ class Client(threading.Thread):
                 self._send_stream_start_timestamp()
             elif data.startswith(self.server.command["dataafter"]):
                 self._handle_command_data_after(data)
+            elif data.startswith(self.server.command["voltsconversion"]):
+                self._handle_command_volts_conversion(data)
         except Exception, e:
             self.server.logger.error(str(e))
             self._send_error_message(str(e))
@@ -517,6 +520,40 @@ class Client(threading.Thread):
 
         self.connection.send( \
         self.server.datastore.find_readings_after(timestamp).csv_repr())
+
+    def _handle_command_volts_conversion(self, data):
+        """Handles a 'voltsconversion' command
+
+        The command should be "voltsconversion <channel>" where <channel> is a
+        channel number. If the specified channel number is invalid, an \
+        exception is raised.
+
+        :param data: data sent by client
+        :raises Exception: if channel is invalid
+        """
+
+        # match channel in data
+        search = self.server.regex_objects[\
+        self.server.command["voltsconversion"]].search(data)
+
+        # if no matches, raise exception
+        if search is None:
+            raise Exception("Could not find valid channel in request")
+
+        # otherwise get the channel
+        channel = int(search.group(1))
+
+        # send the data
+        self._send_conversion_factor(channel)
+
+    def _send_conversion_factor(self, channel):
+        """Sends the voltage conversion factor for the specified channel
+
+        :param channel: the channel to fetch the conversion for
+        """
+
+        self.connection.send( \
+        str(self.server._adc.get_volts_conversion(channel)))
 
 class ServerSocket(object):
     """Provides a socket interface to the ADC server."""

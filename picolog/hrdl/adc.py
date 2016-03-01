@@ -504,6 +504,27 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         # convert to list and return
         return [i for i in data_array]
+    
+    def get_volts_conversion(self, channel):
+        """Returns the conversion factor from counts to volts for the
+        specified channel
+        
+        The conversion factor is in volts per count, so you can get the
+        voltage by multiplying this factor by the raw channel counts:
+        
+            volts = conversion * counts
+        
+        :param channel: the channel to fetch the conversion factor for
+        """
+        
+        # get minimum and maximum counts for this channel
+        (min_counts, max_counts) = self.get_min_max_adc_counts(channel)
+
+        # get maximum voltage (on a single side of the input)
+        v_max = self.get_channel_max_voltage(channel)
+
+        # calculate conversion
+        return = v_max / max_counts
 
     def counts_to_volts(self, counts, channel):
         """Converts the specified counts to volts
@@ -513,14 +534,8 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         :return: voltage equivalent of counts
         """
 
-        # get minimum and maximum counts for this channel
-        (min_counts, max_counts) = self.get_min_max_adc_counts(channel)
-
-        # get maximum voltage (on a single side of the input)
-        v_max = self.get_channel_max_voltage(channel)
-
-        # calculate conversion
-        scale = v_max / max_counts
+        # get conversion
+        scale = self.get_volts_conversion(channel)
 
         # return voltages
         return [count * scale for count in counts]
