@@ -49,7 +49,7 @@ class Server(object):
     """Command strings"""
     command = {"timestamp": "timestamp", "dataafter": "dataafter", \
     "streamstarttimestamp": "streamstarttimestamp", "sampletime": "sampletime", \
-    "voltsconversion": "voltsconversion"}
+    "enabledchannels": "enabledchannels", "voltsconversion": "voltsconversion"}
 
     """Regular expressions"""
     regex = {"dataafter": "dataafter.*?(\\d{1,})", \
@@ -453,6 +453,8 @@ class Client(threading.Thread):
                 self._send_adc_sample_time()
             elif data == self.server.command["streamstarttimestamp"]:
                 self._send_stream_start_timestamp()
+            elif data == self.server.command["enabledchannels"]:
+                self._send_enabled_channels()
             elif data.startswith(self.server.command["dataafter"]):
                 self._handle_command_data_after(data)
             elif data.startswith(self.server.command["voltsconversion"]):
@@ -482,6 +484,11 @@ class Client(threading.Thread):
         """Sends the stream start timestamp to the connected client"""
         self.server.logger.info("Sending stream start timestamp")
         self.connection.send(str(self.server.stream_start_timestamp))
+    
+    def _send_enabled_channels(self):
+        """Sends a comma separated list of the enabled channels"""
+        self.server.logger.info("Sending list of enabled channels")
+        self.connection.send(",".join([str(channel) for channel in self.server._adc.enabled_channels]))
 
     def _send_adc_sample_time(self):
         """Sends the ADC sample time"""
