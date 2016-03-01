@@ -113,7 +113,7 @@ with open(sys.argv[3], "a") as f:
                     continue
                 
                 # scale to volts
-                readings = [int(sample) * factor for sample, factor in zip(datalist[i], conversion)]
+                readings = [int(sample) * factor for sample, factor in zip(datalist[i][1:], conversion)]
 
                 # save the readings
                 datalist[i][1:] = readings
