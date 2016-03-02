@@ -11,7 +11,7 @@ max_adc_connection_attempts = 10
 min_adc_reconnection_delay = 0.5
 hrdl_library_path = /opt/picoscope/lib/libpicohrdl.so
 hrdl_string_buffer_length = 1000
-hrdl_sample_buffer_length = 10
+hrdl_sample_buffer_length = 1000
 
 [datastore]
 max_readings = 1000

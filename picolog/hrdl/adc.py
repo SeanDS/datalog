@@ -491,6 +491,13 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
             
             # add next x samples (where x is the number of channels)
             samples.append(raw_samples[i:i+channel_count])
+        
+        # check last value of i - if it's near the buffer length, we need
+        # to be very careful because wrapping might have occurred
+        if i >= self.sample_buffer_length - 1:
+            # raise a warning
+            self.logger.warning("The sample buffer length ({0}) has been reached for \
+sample(s) received beginning at time {1}".format(self.sample_buffer_length, times[-1]))
 
         # return times and values
         return (times, samples)
