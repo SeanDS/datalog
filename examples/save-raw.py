@@ -83,6 +83,9 @@ with open(sys.argv[3], "a") as f:
     
     # now loop, printing the data received from the ADC
     while True:
+        # sleep for specified time
+        time.sleep(sleep_time)
+        
         # get data
         data = server.get_command_response("dataafter {0}".format(timestamp))
         
@@ -97,12 +100,13 @@ with open(sys.argv[3], "a") as f:
                 
                 continue
             
-            # check if buffer length has been reached
-            if len(datalist) >= 2 and len(datalist[-1]) is not len(datalist[-2]):
-                # last row doesn't have the same number of columns as second last
-                # this indicates the buffer length was reached
-                # discard last row (it will be fetched next time)
-                del(datalist[-1])
+            # delete the last entry, in case the buffer has been reached
+            del(datalist[-1])
+            
+            # without the last entry, do we have any new readings?
+            if len(datalist) < 1:
+                # skip this iteration
+                continue
             
             # loop over data, converting the counts to volts
             for i in xrange(len(datalist)):
@@ -125,6 +129,3 @@ with open(sys.argv[3], "a") as f:
             f.write(convert_to_csv(datalist) + "\n")
         else:
             print("Skipped empty data from server. Timestamp: {0}, received data: {1}".format(timestamp, data))
-
-        # sleep for one reading
-        time.sleep(sleep_time)
