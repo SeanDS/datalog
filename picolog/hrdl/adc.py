@@ -480,7 +480,8 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         # number of active channels
         channel_count = len(self.enabled_channels)
 
-        # loop over at least the first entry (it can be zero, next entries cannot be)
+        # loop over at least the first time and samples set (the first time can be zero,
+        # next entries cannot be)
         for i in range(len(raw_times)):
             # break when first non-zero time after first is found
             if i > 0 and raw_times[i] == 0:
@@ -489,8 +490,14 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
             # add time to list
             times.append(raw_times[i])
             
-            # add next x samples (where x is the number of channels)
-            samples.append(raw_samples[i:i+channel_count])
+            # start index
+            i_start = i * channel_count
+            
+            # end index
+            i_end = i_start + channel_count
+            
+            # add samples from each channel
+            samples.append(raw_samples[i_start:i_end])
         
         # check last value of i - if it's near the buffer length, we need
         # to be very careful because wrapping might have occurred
