@@ -55,7 +55,7 @@ specified samples")
 
     def csv_repr(self):
         """CSV representation of this reading"""
-        
+
         # convert ints to strings and join
         return ",".join([str(item) for item in self.list_repr()])
 
@@ -69,6 +69,22 @@ specified samples")
         str.extend([sample.value for sample in self.samples])
 
         return str
+
+    def sample_dict_gen(self):
+        """List of dicts containing individual samples
+
+        Returns a generator.
+        """
+
+        for sample in self.samples:
+            # get representation
+            representation = sample.dict_repr()
+
+            # add the timestamp
+            representation['timestamp'] = self.reading_time
+
+            # yield the new dict
+            yield representation
 
 class Sample(object):
     """Class to represent a single sample of a single channel."""
@@ -98,6 +114,11 @@ class Sample(object):
         """String representation of this sample"""
 
         return "Channel {0} value: {1}".format(self.channel, self.value)
+
+    def dict_repr(self):
+        """Dict representation of this sample"""
+
+        return {'channel': self.channel, 'value': self.value}
 
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
@@ -148,6 +169,15 @@ class DataStore(object):
         """List representation of this datastore"""
         return [reading.csv_repr() for reading in self.readings]
 
+    def sample_dict_gen(self):
+        """List of dicts containing individual samples, across all channels
+
+        Returns a generator.
+        """
+
+        for reading in self.readings:
+            yield reading.sample_dict_gen()
+
     def insert(self, readings):
         """Inserts the specified readings into the datastore
 
@@ -160,9 +190,9 @@ class DataStore(object):
             # check if reading is not valid - reading is zero and samples are zero
             if reading.reading_time == 0 and not any([sample for sample in reading.samples if sample.value != 0]):
                 continue
-            
+
             # check the reading time is latest
-            if len(self.readings) > 0:                
+            if len(self.readings) > 0:
                 if reading.reading_time <= self.readings[-1].reading_time:
                     raise Exception("A new reading time is earlier than an existing \
 reading time")
