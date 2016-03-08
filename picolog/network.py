@@ -149,8 +149,12 @@ class Server(object):
         int(self.config["server"]["max_connections"])
         self.config["adc"]["conversion_time"] = \
         int(self.config["adc"]["conversion_time"])
+        self.config["adc"]["sample_time"] = \
+        float(self.config["adc"]["sample_time"])
         self.config["adc"]["socket_buffer_length"] = \
         int(self.config["adc"]["socket_buffer_length"])
+        self.config["adc"]["fetch_delay"] = \
+        float(self.config["adc"]["fetch_delay"])
         self.config["adc"]["max_adc_connection_attempts"] = \
         int(self.config["adc"]["max_adc_connection_attempts"])
         self.config["adc"]["min_adc_reconnection_delay"] = \
@@ -273,7 +277,8 @@ Cowardly carrying on.")
         self.datastore = DataStore(self.config["datastore"]["max_readings"])
 
         # create a new data retriever
-        self._retriever = Retriever(self._adc, self.datastore)
+        self._retriever = Retriever(self._adc, self.datastore, \
+        self.config["adc"]["fetch_delay"])
 
         # start retrieval thread
         self._retriever.start()
@@ -364,15 +369,13 @@ attempt".format(delay))
         for index in self.channel_config:
             # get channel dict
             channel = self.channel_config[index]
-            
+
             self._adc.set_analog_in_channel(int(channel["channel"]), \
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
-        
-        # calculate sample time in ms, just num. channels * conversion time, plus 1ms
-        sample_time = self._adc.get_enabled_channels_count() * ConversionTime.get_conversion_time(self.config["adc"]["conversion_time"]) + 1
-        
-        # set sample time
-        self._adc.set_sample_time(sample_time, self.config["adc"]["conversion_time"])
+
+        # set sample time, converting from s to ms
+        self._adc.set_sample_time(self.config["adc"]["sample_time"] * 1000, \
+        self.config["adc"]["conversion_time"])
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
@@ -484,7 +487,7 @@ class Client(threading.Thread):
         """Sends the stream start timestamp to the connected client"""
         self.server.logger.info("Sending stream start timestamp")
         self.connection.send(str(self.server.stream_start_timestamp))
-    
+
     def _send_enabled_channels(self):
         """Sends a comma separated list of the enabled channels"""
         self.server.logger.info("Sending list of enabled channels")

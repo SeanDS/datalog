@@ -14,10 +14,13 @@ class Retriever(threading.Thread):
     """The connected datastore"""
     _datastore = None
 
+    """Delay in seconds between fetch operations"""
+    fetch_delay = None
+
     """Retrieval status"""
     retrieving = None
 
-    def __init__(self, adc, datastore):
+    def __init__(self, adc, datastore, fetch_delay):
         """Initialises the retriever
 
         :param adc: the ADC object to retrieve data from
@@ -30,12 +33,10 @@ class Retriever(threading.Thread):
         # store parameters
         self._adc = adc
         self._datastore = datastore
+        self.fetch_delay = fetch_delay
 
     def run(self):
         """Starts streaming data from the ADC"""
-
-        # calculate the fetch delay in seconds
-        fetch_delay = self._adc.sample_time / 1000
 
         # start streaming from ADC
         self._adc.stream()
@@ -56,7 +57,7 @@ class Retriever(threading.Thread):
                     self._datastore.insert(readings)
 
             # wait until next samples should be ready
-            time.sleep(fetch_delay)
+            time.sleep(self.fetch_delay)
 
     def stop(self):
         """Stops the ADC data stream"""
