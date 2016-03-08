@@ -427,7 +427,7 @@ class Client(threading.Thread):
         self.connection = connection
         self.address = address
 
-        self.server.logger.info("Connection from {0}".format(address))
+        self.server.logger.debug("Connection from {0}".format(address))
 
     def run(self):
         """Runs the client thread"""
@@ -447,7 +447,7 @@ class Client(threading.Thread):
         :param data: data sent by client
         """
 
-        self.server.logger.info("Received message: \"{0}\"".format(data))
+        self.server.logger.debug("Received message: \"{0}\"".format(data))
 
         try:
             if data == self.server.command["timestamp"]:
@@ -468,7 +468,7 @@ class Client(threading.Thread):
 
         self.connection.close()
 
-        self.server.logger.info("Connection closed")
+        self.server.logger.debug("Connection closed")
 
     def _send_error_message(self, message):
         """Sends the client the specified error message
@@ -480,22 +480,22 @@ class Client(threading.Thread):
 
     def _send_timestamp(self):
         """Sends the current timestamp to the connected client"""
-        self.server.logger.info("Sending timestamp")
+        self.server.logger.debug("Sending timestamp")
         self.connection.send(str(self.server.get_timestamp()))
 
     def _send_stream_start_timestamp(self):
         """Sends the stream start timestamp to the connected client"""
-        self.server.logger.info("Sending stream start timestamp")
+        self.server.logger.debug("Sending stream start timestamp")
         self.connection.send(str(self.server.stream_start_timestamp))
 
     def _send_enabled_channels(self):
         """Sends a comma separated list of the enabled channels"""
-        self.server.logger.info("Sending list of enabled channels")
+        self.server.logger.debug("Sending list of enabled channels")
         self.connection.send(",".join([str(channel) for channel in self.server._adc.enabled_channels]))
 
     def _send_adc_sample_time(self):
         """Sends the ADC sample time"""
-        self.server.logger.info("Sending ADC sample time")
+        self.server.logger.debug("Sending ADC sample time")
         self.connection.send(str(self.server._adc.sample_time))
 
     def _handle_command_data_after(self, data):
