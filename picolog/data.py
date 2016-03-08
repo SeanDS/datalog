@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import json
 
 from picolog.constants import Channel
 
@@ -69,6 +70,12 @@ specified samples")
         str.extend([sample.value for sample in self.samples])
 
         return str
+
+    def dict_repr(self):
+        """Dictionary representation of this reading"""
+
+        return {"reading_time": self.reading_time, "channels": self.channels, \
+        "samples": [sample.dict_repr() for sample in self.samples]}
 
     def sample_dict_gen(self):
         """List of dicts containing individual samples
@@ -142,6 +149,26 @@ class DataStore(object):
         # initialise list of readings
         self.readings = []
 
+    @classmethod
+    def instance_from_json(cls, json_str):
+        """Returns a new instance of the datastore using the specified JSON \
+        encoded data
+
+        :param json_str: JSON-encoded data
+        """
+
+        # decode JSON readings
+        readings = json.loads(json_str)
+
+        # new object
+        obj = cls(len(readings))
+
+        # set readings
+        obj.insert_from_json(readings)
+
+        # return
+        return obj
+
     def instance_with_readings(self, readings):
         """Returns a new instance of datastore with the specified readings
 
@@ -168,6 +195,10 @@ class DataStore(object):
     def list_repr(self):
         """List representation of this datastore"""
         return [reading.csv_repr() for reading in self.readings]
+
+    def json_repr(self):
+        """JSON representation of this datastore"""
+        return json.dumps([reading.dict_repr() for reading in self.readings])
 
     def sample_dict_gen(self):
         """List of dicts containing individual samples, across all channels
@@ -204,6 +235,24 @@ reading time")
 
             # everything's ok, so add it to the list
             self.readings.append(reading)
+
+    def insert_from_json(self, json_str):
+        """Inserts readings from the specified JSON-encoded string
+
+        :param json: JSON-encoded string containing readings
+        """
+
+        readings = []
+
+        for row in json_str:
+            # generate values
+            values = [sample['value'] for sample in row['samples']]
+
+            # append new reading
+            readings.append(Reading(row['reading_time'], row['channels'], values))
+
+        # insert
+        self.insert(readings)
 
     def find_reading(self, timestamp):
         """Returns the reading matching the specified time
