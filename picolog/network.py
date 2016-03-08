@@ -374,7 +374,7 @@ attempt".format(delay))
             bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
 
         # set sample time, converting from s to ms
-        self._adc.set_sample_time(self.config["adc"]["sample_time"] * 1000, \
+        self._adc.set_sample_time(int(self.config["adc"]["sample_time"] * 1000), \
         self.config["adc"]["conversion_time"])
 
     def _bind(self):
