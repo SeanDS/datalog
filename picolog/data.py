@@ -41,7 +41,7 @@ class Reading(object):
 specified samples")
 
         # store channels
-        self.channels = channels
+        self.channels = list(channels)
 
         # create samples list
         self.samples = []
