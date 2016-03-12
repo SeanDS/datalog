@@ -524,7 +524,7 @@ class Client(threading.Thread):
         """
 
         self.connection.send( \
-        self.server.datastore.find_readings_after(timestamp).csv_repr())
+        self.server.datastore.find_readings_after(timestamp).json_repr())
 
     def _handle_command_volts_conversion(self, data):
         """Handles a 'voltsconversion' command
@@ -572,7 +572,7 @@ class ServerSocket(object):
     """Response receive buffer size"""
     buffer_length = None
 
-    def __init__(self, host, port, buffer_length=10000):
+    def __init__(self, host, port, buffer_length=65536):
         """Initialises the socket server
 
         :param host: the host to connect to
