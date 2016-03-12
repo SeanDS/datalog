@@ -56,9 +56,6 @@ class Server(object):
         "voltsconversion": "voltsconversion.*?(\\d{1,2})"}
     regex_objects = None
 
-    """Timestamp corresponding to the start of a data stream"""
-    stream_start_timestamp = None
-
     """Server running status, used by threads"""
     server_running = None
 
@@ -283,9 +280,6 @@ Cowardly carrying on.")
         # start retrieval thread
         self._retriever.start()
 
-        # record the current timestamp
-        self.stream_start_timestamp = self.get_timestamp()
-
     def stop(self):
         """Closes all open connections, including to the ADC"""
 
@@ -486,7 +480,7 @@ class Client(threading.Thread):
     def _send_stream_start_timestamp(self):
         """Sends the stream start timestamp to the connected client"""
         self.server.logger.debug("Sending stream start timestamp")
-        self.connection.send(str(self.server.stream_start_timestamp))
+        self.connection.send(str(self.server._adc.stream_start_timestamp))
 
     def _send_enabled_channels(self):
         """Sends a comma separated list of the enabled channels"""

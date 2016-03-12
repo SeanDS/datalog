@@ -35,6 +35,9 @@ class PicoLogAdc(object):
     """Total time required to collect samples of enabled channels"""
     sample_time = None
 
+    """Stream start timestamp, in ms"""
+    stream_start_timestamp = None
+
     """Enabled channels set"""
     enabled_channels = set()
 
@@ -403,7 +406,11 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         self.logger.info("Starting unit streaming")
 
+        # run stream
         self._run(SampleMethod.STREAM)
+
+        # save timestamp
+        self.stream_start_timestamp = int(round(time.time() * 1000))
 
         self.logger.info("Unit streaming started successfully")
 
@@ -440,10 +447,13 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
 
         # empty list of readings
         readings = []
-        
+
         # loop over times, adding readings
         for time, data in zip(times, samples):
-            readings.append(Reading(time, self.enabled_channels, data))
+            # convert time from ms since stream start to UNIX timestamp (in ms)
+            real_time = self.stream_start_timestamp + time
+
+            readings.append(Reading(real_time, self.enabled_channels, data))
 
         return readings
 
@@ -476,7 +486,7 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
         # empty lists for cleaned up times and samples
         times = []
         samples = []
-        
+
         # number of active channels
         channel_count = len(self.enabled_channels)
 
@@ -486,19 +496,19 @@ vrange={2}, type={3}".format(channel, enabled, vrange, itype))
             # break when first non-zero time after first is found
             if i > 0 and raw_times[i] == 0:
                 break
-            
+
             # add time to list
             times.append(raw_times[i])
-            
+
             # start index
             i_start = i * channel_count
-            
+
             # end index
             i_end = i_start + channel_count
-            
+
             # add samples from each channel
             samples.append(raw_samples[i_start:i_end])
-        
+
         # check last value of i - if it's near the buffer length, we need
         # to be very careful because wrapping might have occurred
         if i >= self.sample_buffer_length - 1:
@@ -518,19 +528,19 @@ sample(s) received beginning at time {1}".format(self.sample_buffer_length, time
 
         # convert to list and return
         return [i for i in data_array]
-    
+
     def get_volts_conversion(self, channel):
         """Returns the conversion factor from counts to volts for the
         specified channel
-        
+
         The conversion factor is in volts per count, so you can get the
         voltage by multiplying this factor by the raw channel counts:
-        
+
             volts = conversion * counts
-        
+
         :param channel: the channel to fetch the conversion factor for
         """
-        
+
         # get minimum and maximum counts for this channel
         (min_counts, max_counts) = self.get_min_max_adc_counts(channel)
 

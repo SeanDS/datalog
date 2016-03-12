@@ -33,7 +33,7 @@ class Reading(object):
         """
 
         # set parameters
-        self.reading_time = reading_time
+        self.reading_time = int(reading_time)
 
         # check channels and samples lists are same length
         if len(channels) is not len(samples):
@@ -54,12 +54,6 @@ specified samples")
         """String representation of this reading"""
         return self.csv_repr()
 
-    def csv_repr(self):
-        """CSV representation of this reading"""
-
-        # convert ints to strings and join
-        return ",".join([str(item) for item in self.list_repr()])
-
     def list_repr(self):
         """List representation of this reading"""
 
@@ -70,6 +64,18 @@ specified samples")
         str.extend([sample.value for sample in self.samples])
 
         return str
+
+    def csv_repr(self):
+        """CSV representation of this reading"""
+
+        # convert ints to strings and join
+        return ",".join([str(item) for item in self.list_repr()])
+
+    def whitespace_repr(self):
+        """Whitespace-separated representation of this reading"""
+
+        # convert list to space-separated string
+        return " ".join([str(item) for item in self.list_repr()])
 
     def dict_repr(self):
         """Dictionary representation of this reading"""
@@ -93,6 +99,19 @@ specified samples")
             # yield the new dict
             yield representation
 
+    def apply_function(self, function):
+        """Applies the specified function to the samples in this reading
+
+        :param function: function to apply to samples
+        """
+
+        # call function
+        output = function([sample.value for sample in self.samples])
+
+        # save the function outputs back into the samples
+        for sample, new_value in zip(self.samples, output):
+            sample.value = new_value
+
 class Sample(object):
     """Class to represent a single sample of a single channel."""
 
@@ -115,7 +134,7 @@ class Sample(object):
         else:
             raise ValueError("Invalid channel")
 
-        self.value = value
+        self.value = float(value)
 
     def __repr__(self):
         """String representation of this sample"""
@@ -130,44 +149,64 @@ class Sample(object):
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
 
-    """Maximum number of readings to store before overwriting oldest"""
-    max_readings = None
+    """Number of readings to store"""
+    reading_storage_length = None
+
+    """Whether to increase buffer for new readings beyond storage limit, or \
+    delete old ones"""
+    increase_buffer = None
+
+    """Conversion callback methods"""
+    conversion_callbacks = None
 
     """Readings"""
     readings = None
 
-    def __init__(self, max_readings):
+    def __init__(self, reading_storage_length, increase_buffer=False, \
+    conversion_callbacks=[]):
         """Initialises the datastore
 
-        :param max_readings: the maximum number of readings to hold in the \
-        datastore
+        :param reading_storage_length: the maximum number of readings to hold \
+        in the datastore
+        :param increase_buffer: increase the buffer to fit the new data
+        :param conversion_callbacks: list of methods to call on each reading's \
+        data
         """
 
         # set parameters
-        self.max_readings = max_readings
+        self.reading_storage_length = int(reading_storage_length)
+        self.increase_buffer = increase_buffer
+        self.conversion_callbacks = conversion_callbacks
 
         # initialise list of readings
         self.readings = []
 
     @classmethod
-    def instance_from_json(cls, json_str):
+    def instance_from_dict(cls, ddict, *args, **kwargs):
+        """Returns a new instance of the datastore using the specified dict
+
+        :param ddict: dict of data
+        """
+
+        # new object
+        obj = cls(len(ddict), *args, **kwargs)
+
+        # set readings
+        obj.insert_from_dict(ddict)
+
+        # return
+        return obj
+
+    @classmethod
+    def instance_from_json(cls, json_str, *args, **kwargs):
         """Returns a new instance of the datastore using the specified JSON \
         encoded data
 
         :param json_str: JSON-encoded data
         """
 
-        # decode JSON readings
-        readings = json.loads(json_str)
-
-        # new object
-        obj = cls(len(readings))
-
-        # set readings
-        obj.insert_from_json(readings)
-
-        # return
-        return obj
+        # decode JSON readings and create a new instance
+        return cls.instance_from_dict(json.loads(json_str), *args, **kwargs)
 
     def instance_with_readings(self, readings):
         """Returns a new instance of datastore with the specified readings
@@ -176,7 +215,7 @@ class DataStore(object):
         """
 
         # new object
-        obj = self.__class__(self.max_readings)
+        obj = self.__class__(self.reading_storage_length)
 
         # set readings
         obj.insert(readings)
@@ -219,32 +258,49 @@ class DataStore(object):
         # add each reading, but check it is a later timestamp than the last
         for reading in readings:
             # check if reading is not valid - reading is zero and samples are zero
-            if reading.reading_time == 0 and not any([sample for sample in reading.samples if sample.value != 0]):
+            if reading.reading_time == 0 and not \
+            any([sample for sample in reading.samples if sample.value != 0]):
                 continue
 
             # check the reading time is latest
             if len(self.readings) > 0:
                 if reading.reading_time <= self.readings[-1].reading_time:
-                    raise Exception("A new reading time is earlier than an existing \
-reading time")
+                    raise Exception("A new reading time is earlier than an \
+existing reading time")
 
             # check length and remove a reading if necessary
-            if len(self.readings) >= self.max_readings:
-                # delete oldest reading
-                del(self.readings[0])
+            if len(self.readings) >= self.reading_storage_length:
+                if self.increase_buffer:
+                    # increment buffer count
+                    self.reading_storage_length += 1
+                else:
+                    # delete oldest reading
+                    del(self.readings[0])
 
             # everything's ok, so add it to the list
-            self.readings.append(reading)
+            self._insert_reading(reading)
 
-    def insert_from_json(self, json_str):
-        """Inserts readings from the specified JSON-encoded string
+    def _insert_reading(self, reading):
+        """Inserts the specified reading, converting it if necessary
 
-        :param json: JSON-encoded string containing readings
+        :param reading: reading to insert
+        """
+
+        # call conversion functions
+        map(lambda func: reading.apply_function(func), self.conversion_callbacks)
+
+        # add reading to storage
+        self.readings.append(reading)
+
+    def insert_from_dict(self, ddict, *args, **kwargs):
+        """Inserts readings from the specified dict
+
+        :param ddict: dict containing readings
         """
 
         readings = []
 
-        for row in json_str:
+        for row in ddict:
             # generate values
             values = [sample['value'] for sample in row['samples']]
 
@@ -252,7 +308,7 @@ reading time")
             readings.append(Reading(row['reading_time'], row['channels'], values))
 
         # insert
-        self.insert(readings)
+        self.insert(readings, *args, **kwargs)
 
     def find_reading(self, timestamp):
         """Returns the reading matching the specified time
