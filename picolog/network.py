@@ -624,7 +624,7 @@ class ServerSocket(object):
             section = connection.recv(self.buffer_length)
 
             # if we get "", that means the message has ended
-            if section is "":
+            if section == "":
                 break
 
             # otherwise, add this section to the message
