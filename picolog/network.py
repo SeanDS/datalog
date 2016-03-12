@@ -52,7 +52,7 @@ class Server(object):
     "enabledchannels": "enabledchannels", "voltsconversion": "voltsconversion"}
 
     """Regular expressions"""
-    regex = {"dataafter": "dataafter.*?(\\d{1,}).*?(\\d{1,})", \
+    regex = {"dataafter": "dataafter.*?(\\d{1,})", \
         "voltsconversion": "voltsconversion.*?(\\d{1,2})"}
     regex_objects = None
 
@@ -496,9 +496,8 @@ class Client(threading.Thread):
         """Handles a 'dataafter' command
 
         The command should be "dataafter <time> <buffer length>" where <time> \
-        is a valid time in milliseconds and <buffer length> is the client's \
-        buffer length in bytes. If the specified timestamp is invalid, an \
-        exception is raised.
+        is a valid time in milliseconds. If the specified timestamp is invalid, \
+        an exception is raised.
 
         :param data: data sent by client
         :raises Exception: if timestamp is invalid
@@ -515,25 +514,20 @@ class Client(threading.Thread):
         # get the timestamp
         timestamp = int(search.group(1))
 
-        # get the buffer size
-        buffer_size = int(search.group(2))
-
         # send the data
-        self._send_data_after(timestamp, buffer_size)
+        self._send_data_after(timestamp)
 
-    def _send_data_after(self, timestamp, buffer_size):
+    def _send_data_after(self, timestamp):
         """Sends the data collected since the specified timestamp
 
         :param timestamp: timestamp to send data since
-        :param buffer_size: client's buffer size
         """
 
         # get readings
         datastore = self.server.datastore.find_readings_after(timestamp)
 
         # send readings
-        self.connection.send(datastore.json_repr(max_bytes=buffer_size, \
-        max_bytes_data_trim=True))
+        self.connection.send(datastore.json_repr())
 
     def _handle_command_volts_conversion(self, data):
         """Handles a 'voltsconversion' command
@@ -581,7 +575,7 @@ class ServerSocket(object):
     """Response receive buffer size"""
     buffer_length = None
 
-    def __init__(self, host, port, buffer_length=65536):
+    def __init__(self, host, port, buffer_length=4096):
         """Initialises the socket server
 
         :param host: the host to connect to
