@@ -617,5 +617,17 @@ class ServerSocket(object):
         # send command
         connection.send(command)
 
-        # return response
-        return connection.recv(self.buffer_length)
+        # get response
+        message = ""
+
+        while True:
+            section = connection.recv(self.buffer_length)
+
+            # if we get "", that means the message has ended
+            if section is None:
+                break
+
+            # otherwise, add this section to the message
+            message += section
+
+        return message
