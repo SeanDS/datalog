@@ -52,7 +52,7 @@ class Server(object):
     "enabledchannels": "enabledchannels", "voltsconversion": "voltsconversion"}
 
     """Regular expressions"""
-    regex = {"dataafter": "dataafter.*?(\\d{1,})", \
+    regex = {"dataafter": "dataafter.*?(\\d{1,}).*?(\\d{1,})", \
         "voltsconversion": "voltsconversion.*?(\\d{1,2})"}
     regex_objects = None
 
@@ -495,8 +495,9 @@ class Client(threading.Thread):
     def _handle_command_data_after(self, data):
         """Handles a 'dataafter' command
 
-        The command should be "dataafter <time>" where <time> is a
-        valid time in milliseconds. If the specified timestamp is invalid, an \
+        The command should be "dataafter <time> <buffer length>" where <time> \
+        is a valid time in milliseconds and <buffer length> is the client's \
+        buffer length in bytes. If the specified timestamp is invalid, an \
         exception is raised.
 
         :param data: data sent by client
@@ -511,20 +512,28 @@ class Client(threading.Thread):
         if search is None:
             raise Exception("Could not find valid timestamp in request")
 
-        # otherwise get the timestamp
+        # get the timestamp
         timestamp = int(search.group(1))
 
-        # send the data
-        self._send_data_after(timestamp)
+        # get the buffer size
+        buffer_size = int(search.group(2))
 
-    def _send_data_after(self, timestamp):
+        # send the data
+        self._send_data_after(timestamp, buffer_size)
+
+    def _send_data_after(self, timestamp, buffer_size):
         """Sends the data collected since the specified timestamp
 
         :param timestamp: timestamp to send data since
+        :param buffer_size: client's buffer size
         """
 
-        self.connection.send( \
-        self.server.datastore.find_readings_after(timestamp).json_repr())
+        # get readings
+        datastore = self.server.datastore.find_readings_after(timestamp)
+
+        # send readings
+        self.connection.send(datastore.json_repr(max_bytes=buffer_size, \
+        max_bytes_data_trim=True))
 
     def _handle_command_volts_conversion(self, data):
         """Handles a 'voltsconversion' command

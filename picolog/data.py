@@ -235,9 +235,36 @@ class DataStore(object):
         """List representation of this datastore"""
         return [reading.csv_repr() for reading in self.readings]
 
-    def json_repr(self):
-        """JSON representation of this datastore"""
-        return json.dumps([reading.dict_repr() for reading in self.readings])
+    def json_repr(self, max_bytes=None, max_bytes_data_trim=True):
+        """JSON representation of this datastore
+
+        :param buffer_size: the maximum bytes to represent the data with
+        :param max_bytes_data_trim: whether to trim the data if the maximum bytes
+        are exceeded, or else throw an exception
+        :raises Exception: if max bytes is exceeded and trim is disabled
+        """
+
+        # get list of JSON-encoded readings
+        json_readings = [reading.dict_repr() for reading in self.readings]
+
+        # get initial encoded JSON
+        json_encoded = json.dumps(json_readings)
+
+        # check data length
+        if len(json_encoded) > max_bytes:
+            if max_bytes_data_trim:
+                # encode subsets of list until it fits
+                # NOTE: this only works because dict_repr() returns ASCII encoded strings
+                # In Python 3 this will probably break
+                while len(json_encoded) > max_bytes:
+                    # remove last row
+                    json_encoded = json.dumps(json_readings[:-1])
+            else:
+                # throw exception
+                raise Exception("Data is longer than maximum bytes and trim is \
+not enabled")
+
+        return json_encoded
 
     def sample_dict_gen(self):
         """List of dicts containing individual samples, across all channels
