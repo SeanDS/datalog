@@ -585,8 +585,8 @@ class ServerSocket(object):
 
         # set parameters
         self.host = host
-        self.port = port
-        self.buffer_length = buffer_length
+        self.port = int(port)
+        self.buffer_length = int(buffer_length)
 
     def get_connection(self):
         """Returns a new connection to the server"""
@@ -629,5 +629,8 @@ class ServerSocket(object):
 
             # otherwise, add this section to the message
             message += section
+
+        # close socket
+        connection.close()
 
         return message
