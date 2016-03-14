@@ -590,18 +590,24 @@ class ServerSocket(object):
     """Response receive buffer size"""
     buffer_length = None
 
-    def __init__(self, host, port, buffer_length=4096):
+    """Timeout for receiving response from server"""
+    timeout = None
+
+    def __init__(self, host, port, buffer_length=4096, timeout=5):
         """Initialises the socket server
 
         :param host: the host to connect to
         :param port: the port to connect to
         :param buffer: the buffer length to use to receive server responses
+        :param timeout: the time to wait for the server to finish responding \
+        before raising an exception
         """
 
         # set parameters
         self.host = host
         self.port = int(port)
         self.buffer_length = int(buffer_length)
+        self.timeout = int(timeout)
 
     def get_connection(self):
         """Returns a new connection to the server"""
@@ -626,6 +632,7 @@ class ServerSocket(object):
         This function correctly handles the EOF character sent by the server.
 
         :param command: the command to send to the server
+        :raises Exception: if server times out
         """
 
         # get connection
@@ -634,8 +641,11 @@ class ServerSocket(object):
         # send command
         connection.send(command)
 
-        # get response
+        # empty client message
         message = ""
+
+        # start time
+        start_time = time.time()
 
         while True:
             # get next chunk
@@ -647,6 +657,10 @@ class ServerSocket(object):
                 message = message[:-1]
 
                 break
+
+            # check for timeout
+            if time.time() - start_time > self.timeout:
+                raise Exception("Server timed out")
 
         # close socket
         connection.close()
