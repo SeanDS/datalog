@@ -3,6 +3,7 @@ host = localhost
 port = 50000
 max_connections = 5
 log_format = %(asctime)s - %(name)s - %(levelname)s - %(message)s
+max_readings_per_request = 1000
 
 [adc]
 conversion_time = 2
@@ -16,4 +17,4 @@ hrdl_string_buffer_length = 1000
 hrdl_sample_buffer_length = 1000
 
 [datastore]
-max_readings = 1000000
+max_readings = 10000

@@ -320,22 +320,38 @@ existing reading time")
         return next((reading for reading in self.readings \
         if reading.reading_time == timestamp), None)
 
-    def find_readings_after(self, timestamp):
+    def find_readings_after(self, timestamp, max_readings=None):
         """Returns a new datastore containing readings after the specified time
 
         :param timestamp: the timestamp to find readings after
+        :param max_readings: maximum number of readings to return
         """
 
-        # return new datastore containing readings with timestamp >= specified timestamp
-        return self.instance_with_readings([reading for reading in self.readings \
-        if reading.reading_time > timestamp])
+        # sanitise max readings
+        if max_readings is not None:
+            max_readings = int(max_readings)
 
-    def find_readings_before(self, timestamp):
+        # create new datastore containing readings with timestamp >= specified timestamp
+        readings = self.instance_with_readings([reading for reading \
+        in self.readings if reading.reading_time > timestamp])
+
+        # return up to the maximum number
+        return readings[:max_readings]
+
+    def find_readings_before(self, timestamp, max_readings=None):
         """Returns a new datastore containing readings before the specified time
 
         :param timestamp: the timestamp to find readings before
+        :param max_readings: maximum number of readings to return
         """
 
-        # return new datastore containing readings with timestamp < specified timestamp
-        return self.instance_with_readings([reading for reading in self.readings \
+        # sanitise max readings
+        if max_readings is not None:
+            max_readings = int(max_readings)
+
+        # create new datastore containing readings with timestamp < specified timestamp
+        readings = self.instance_with_readings([reading for reading in self.readings \
         if reading.reading_time <= timestamp])
+
+        # return up to the maximum number
+        return readings[:max_readings]

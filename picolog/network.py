@@ -144,6 +144,8 @@ class Server(object):
         self.config["server"]["port"] = int(self.config["server"]["port"])
         self.config["server"]["max_connections"] = \
         int(self.config["server"]["max_connections"])
+        self.config["server"]["max_readings_per_request"] = \
+        int(self.config["server"]["max_readings_per_request"])
         self.config["adc"]["conversion_time"] = \
         int(self.config["adc"]["conversion_time"])
         self.config["adc"]["sample_time"] = \
@@ -524,7 +526,8 @@ class Client(threading.Thread):
         """
 
         # get readings
-        datastore = self.server.datastore.find_readings_after(timestamp)
+        datastore = self.server.datastore.find_readings_after(timestamp, \
+        max_readings=self.server.config["server"]["max_readings_per_request"])
 
         # send readings
         self.connection.send(datastore.json_repr())
