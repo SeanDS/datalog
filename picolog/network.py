@@ -65,6 +65,9 @@ class Server(object):
     """Connected clients"""
     _clients = None
 
+    """EOF string used by Client._send_with_eof"""
+    EOF_STRING = "\0"
+
     def __init__(self, config_path=None, channel_config_path=None, \
     info_stream=sys.stdout, error_stream=sys.stderr):
         """Initialises the server
@@ -462,9 +465,18 @@ class Client(threading.Thread):
             self.server.logger.error(str(e))
             self._send_error_message(str(e))
 
-        self.connection.close()
+        self.stop()
 
         self.server.logger.debug("Connection closed")
+
+    def _send(self, message):
+        """Sends the specified message to the client ending with the predefined \
+        EOF string
+
+        :param message: message to send
+        """
+
+        self.connection.send(message + Server.EOF_STRING)
 
     def _send_error_message(self, message):
         """Sends the client the specified error message
@@ -472,27 +484,27 @@ class Client(threading.Thread):
         :param message: error message
         """
 
-        self.connection.send(message)
+        self._send(message)
 
     def _send_timestamp(self):
         """Sends the current timestamp to the connected client"""
         self.server.logger.debug("Sending timestamp")
-        self.connection.send(str(self.server.get_timestamp()))
+        self._send(str(self.server.get_timestamp()))
 
     def _send_stream_start_timestamp(self):
         """Sends the stream start timestamp to the connected client"""
         self.server.logger.debug("Sending stream start timestamp")
-        self.connection.send(str(self.server._adc.stream_start_timestamp))
+        self._send(str(self.server._adc.stream_start_timestamp))
 
     def _send_enabled_channels(self):
         """Sends a comma separated list of the enabled channels"""
         self.server.logger.debug("Sending list of enabled channels")
-        self.connection.send(",".join([str(channel) for channel in self.server._adc.enabled_channels]))
+        self._send(",".join([str(channel) for channel in self.server._adc.enabled_channels]))
 
     def _send_adc_sample_time(self):
         """Sends the ADC sample time"""
         self.server.logger.debug("Sending ADC sample time")
-        self.connection.send(str(self.server._adc.sample_time))
+        self._send(str(self.server._adc.sample_time))
 
     def _handle_command_data_after(self, data):
         """Handles a 'dataafter' command
@@ -530,7 +542,7 @@ class Client(threading.Thread):
         max_readings=self.server.config["server"]["max_readings_per_request"])
 
         # send readings
-        self.connection.send(datastore.json_repr())
+        self._send(datastore.json_repr())
 
     def _handle_command_volts_conversion(self, data):
         """Handles a 'voltsconversion' command
@@ -563,7 +575,7 @@ class Client(threading.Thread):
         :param channel: the channel to fetch the conversion for
         """
 
-        self.connection.send( \
+        self._send( \
         str(self.server._adc.get_volts_conversion(channel)))
 
 class ServerSocket(object):
@@ -611,6 +623,8 @@ class ServerSocket(object):
         """Connects to the server, sends it the specified command and returns \
         the response
 
+        This function correctly handles the EOF character sent by the server.
+
         :param command: the command to send to the server
         """
 
@@ -624,14 +638,15 @@ class ServerSocket(object):
         message = ""
 
         while True:
-            section = connection.recv(self.buffer_length)
+            # get next chunk
+            message += connection.recv(self.buffer_length)
 
-            # if we get "", that means the message has ended
-            if section == "":
+            # check for EOF
+            if message[-1] is Server.EOF_STRING:
+                # we've found the EOF, so break, after removing the EOF character
+                message = message[:-1]
+
                 break
-
-            # otherwise, add this section to the message
-            message += section
 
         # close socket
         connection.close()
