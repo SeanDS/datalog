@@ -338,8 +338,8 @@ existing reading time")
         # remove readings up to max
         readings.readings = readings.readings[:max_readings]
 
-        # return up to the maximum number
-        return readings[:max_readings]
+        # return datastore
+        return readings
 
     def find_readings_before(self, timestamp, max_readings=None):
         """Returns a new datastore containing readings before the specified time
@@ -359,5 +359,5 @@ existing reading time")
         # remove readings up to max
         readings.readings = readings.readings[:max_readings]
 
-        # return up to the maximum number
-        return readings[:max_readings]
+        # return datastore
+        return readings
