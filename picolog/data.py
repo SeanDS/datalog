@@ -335,6 +335,9 @@ existing reading time")
         readings = self.instance_with_readings([reading for reading \
         in self.readings if reading.reading_time > timestamp])
 
+        # remove readings up to max
+        readings.readings = readings.readings[:max_readings]
+
         # return up to the maximum number
         return readings[:max_readings]
 
@@ -352,6 +355,9 @@ existing reading time")
         # create new datastore containing readings with timestamp < specified timestamp
         readings = self.instance_with_readings([reading for reading in self.readings \
         if reading.reading_time <= timestamp])
+        
+        # remove readings up to max
+        readings.readings = readings.readings[:max_readings]
 
         # return up to the maximum number
         return readings[:max_readings]
