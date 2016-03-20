@@ -83,6 +83,10 @@ specified samples")
         return {"reading_time": self.reading_time, "channels": self.channels, \
         "samples": [sample.dict_repr() for sample in self.samples]}
 
+    def json_repr(self):
+        """JSON representation of this reading"""
+        return json.dumps(self.dict_repr())
+
     def sample_dict_gen(self):
         """List of dicts containing individual samples
 
@@ -98,6 +102,30 @@ specified samples")
 
             # yield the new dict
             yield representation
+
+    @classmethod
+    def instance_from_dict(cls, ddict):
+        """Returns a new instance of the reading using the specified dict
+
+        :param ddict: dict of data
+        """
+
+        # generate sample values
+        values = [sample["value"] for sample in ddict["samples"]]
+
+        # return new object
+        return cls(ddict["reading_time"], ddict["channels"], values)
+
+    @classmethod
+    def instance_from_json(cls, json_str):
+        """Returns a new instance of the reading using the specified JSON \
+        encoded data
+
+        :param json_str: JSON-encoded data
+        """
+
+        # decode JSON readings and create a new instance
+        return cls.instance_from_dict(json.loads(json_str))
 
     def apply_function(self, function):
         """Applies the specified function to the samples in this reading
@@ -298,14 +326,8 @@ existing reading time")
         :param ddict: dict containing readings
         """
 
-        readings = []
-
-        for row in ddict:
-            # generate values
-            values = [sample['value'] for sample in row['samples']]
-
-            # append new reading
-            readings.append(Reading(row['reading_time'], row['channels'], values))
+        # create readings
+        readings = [Reading.instance_from_json(row) for row in ddict]
 
         # insert
         self.insert(readings, *args, **kwargs)
