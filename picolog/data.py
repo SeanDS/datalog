@@ -116,6 +116,16 @@ specified samples")
         # return new object
         return cls(ddict["reading_time"], ddict["channels"], values)
 
+    @classmethod
+    def instance_from_json(cls, json_str):
+        """Returns a new instance of the reading using the specified \
+        JSON-encoded string
+
+        :param json_str: JSON-encoded data
+        """
+
+        return cls.instance_from_dict(json.loads(json_str))
+
     def apply_function(self, function):
         """Applies the specified function to the samples in this reading
 
