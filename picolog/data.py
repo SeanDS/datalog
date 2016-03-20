@@ -116,17 +116,6 @@ specified samples")
         # return new object
         return cls(ddict["reading_time"], ddict["channels"], values)
 
-    @classmethod
-    def instance_from_json(cls, json_str):
-        """Returns a new instance of the reading using the specified JSON \
-        encoded data
-
-        :param json_str: JSON-encoded data
-        """
-
-        # decode JSON readings and create a new instance
-        return cls.instance_from_dict(json.loads(json_str))
-
     def apply_function(self, function):
         """Applies the specified function to the samples in this reading
 
@@ -210,22 +199,6 @@ class DataStore(object):
         self.readings = []
 
     @classmethod
-    def instance_from_dict(cls, ddict, *args, **kwargs):
-        """Returns a new instance of the datastore using the specified dict
-
-        :param ddict: dict of data
-        """
-
-        # new object
-        obj = cls(len(ddict), *args, **kwargs)
-
-        # set readings
-        obj.insert_from_dict(ddict)
-
-        # return
-        return obj
-
-    @classmethod
     def instance_from_json(cls, json_str, *args, **kwargs):
         """Returns a new instance of the datastore using the specified JSON \
         encoded data
@@ -233,8 +206,17 @@ class DataStore(object):
         :param json_str: JSON-encoded data
         """
 
-        # decode JSON readings and create a new instance
-        return cls.instance_from_dict(json.loads(json_str), *args, **kwargs)
+        # decode JSON readings
+        data = json.loads(json_str)
+
+        # create a new instance
+        obj = cls(len(data), *args, **kwargs)
+
+        # set readings
+        obj.insert_from_json_list(data)
+
+        # return
+        return obj
 
     def instance_with_readings(self, readings):
         """Returns a new instance of datastore with the specified readings
@@ -320,14 +302,14 @@ existing reading time")
         # add reading to storage
         self.readings.append(reading)
 
-    def insert_from_dict(self, ddict, *args, **kwargs):
+    def insert_from_json_list(self, data, *args, **kwargs):
         """Inserts readings from the specified dict
 
-        :param ddict: dict containing readings
+        :param data: list containing reading dicts
         """
 
         # create readings
-        readings = [Reading.instance_from_json(row) for row in ddict]
+        readings = [Reading.instance_from_dict(row) for row in data]
 
         # insert
         self.insert(readings, *args, **kwargs)
@@ -377,7 +359,7 @@ existing reading time")
         # create new datastore containing readings with timestamp < specified timestamp
         readings = self.instance_with_readings([reading for reading in self.readings \
         if reading.reading_time <= timestamp])
-        
+
         # remove readings up to max
         readings.readings = readings.readings[:max_readings]
 
