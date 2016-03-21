@@ -3,7 +3,7 @@ host = localhost
 port = 50000
 max_connections = 5
 log_format = %(asctime)s - %(name)s - %(levelname)s - %(message)s
-max_readings_per_request = 1000
+max_readings_per_request = 3000
 
 [adc]
 conversion_time = 2
