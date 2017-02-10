@@ -1,13 +1,8 @@
-from __future__ import print_function
-
 import os
 import json
+from collections import deque
 
-from picolog.constants import Channel
-
-"""
-Data representation classes.
-"""
+"""Data representation classes."""
 
 class Reading(object):
     """Class to represent an ADC reading for a particular time. This contains
@@ -156,11 +151,7 @@ class Sample(object):
         :raises ValueError: if channel is invalid
         """
 
-        if Channel.is_valid(channel):
-            self.channel = channel
-        else:
-            raise ValueError("Invalid channel")
-
+        self.channel = int(channel)
         self.value = float(value)
 
     def __repr__(self):
@@ -176,37 +167,18 @@ class Sample(object):
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
 
-    """Number of readings to store"""
-    reading_storage_length = None
-
-    """Whether to increase buffer for new readings beyond storage limit, or \
-    delete old ones"""
-    increase_buffer = None
-
-    """Conversion callback methods"""
-    conversion_callbacks = None
-
-    """Readings"""
-    readings = None
-
-    def __init__(self, reading_storage_length, increase_buffer=False, \
-    conversion_callbacks=[]):
+    def __init__(self, queue_len, conversion_callbacks=[]):
         """Initialises the datastore
 
-        :param reading_storage_length: the maximum number of readings to hold \
-        in the datastore
-        :param increase_buffer: increase the buffer to fit the new data
+        :param queue_len: the maximum number of readings to hold in the datastore
         :param conversion_callbacks: list of methods to call on each reading's \
         data
         """
 
-        # set parameters
-        self.reading_storage_length = int(reading_storage_length)
-        self.increase_buffer = increase_buffer
-        self.conversion_callbacks = conversion_callbacks
+        self.conversion_callbacks = list(conversion_callbacks)
 
-        # initialise list of readings
-        self.readings = []
+        # initialise readings as a queue
+        self.readings = deque([], queue_len)
 
     @classmethod
     def instance_from_json(cls, json_str, *args, **kwargs):
@@ -234,11 +206,11 @@ class DataStore(object):
         :param readings: list of readings
         """
 
-        # new object
-        obj = self.__class__(self.reading_storage_length)
+        # new object with the same max length
+        obj = self.__class__(self, self.maxlen)
 
-        # set readings
-        obj.insert(readings)
+        # add the existing readings
+        obj.extend(readings)
 
         # return
         return obj
@@ -265,6 +237,7 @@ class DataStore(object):
         Returns a generator.
         """
 
+        # FIXME: can this instead use list comprehension?
         for reading in self.readings:
             yield reading.sample_dict_gen()
 
@@ -285,17 +258,8 @@ class DataStore(object):
             # check the reading time is latest
             if len(self.readings) > 0:
                 if reading.reading_time <= self.readings[-1].reading_time:
-                    raise Exception("A new reading time is earlier than an \
-existing reading time")
-
-            # check length and remove a reading if necessary
-            if len(self.readings) >= self.reading_storage_length:
-                if self.increase_buffer:
-                    # increment buffer count
-                    self.reading_storage_length += 1
-                else:
-                    # delete oldest reading
-                    del(self.readings[0])
+                    raise Exception("A new reading time is earlier than or "
+                                    "equal to an existing reading time")
 
             # everything's ok, so add it to the list
             self._insert_reading(reading)
@@ -307,7 +271,7 @@ existing reading time")
         """
 
         # call conversion functions
-        map(lambda func: reading.apply_function(func), self.conversion_callbacks)
+        map(reading.apply_function, self.conversion_callbacks)
 
         # add reading to storage
         self.readings.append(reading)
@@ -346,7 +310,7 @@ existing reading time")
             max_readings = int(max_readings)
 
         # create new datastore containing readings with timestamp >= specified timestamp
-        readings = self.instance_with_readings([reading for reading \
+        readings = self.filtered_instance([reading for reading \
         in self.readings if reading.reading_time > timestamp])
 
         # remove readings up to max
