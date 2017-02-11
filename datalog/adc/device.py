@@ -1,10 +1,11 @@
 import logging
 import abc
 from configparser import ConfigParser
+from contextlib import contextmanager
 import collections
 
 from datalog.data import Reading
-
+from datalog.adc.fetch import Retriever
 
 class Adc(object):
     """Represents ADC hardware"""
@@ -37,11 +38,33 @@ class Adc(object):
         else:
             raise ValueError('Unrecognised unit type')
 
-    def __enter__(self):
-        if not self.library.is_open():
+    def is_open(self):
+        return self.library.is_open()
+
+    @contextmanager
+    def retriever(self, datastore):
+        if not self.is_open():
             self.library.open()
 
-    def __exit__(self, exc_type, exc_value, traceback):
+        # create the retriever
+        retriever = Retriever(self, datastore, self.config)
+
+        # set the context flag to allow it to run
+        retriever._context = True
+
+        # start the retriever thread
+        retriever.start()
+
+        # return the retriever to the caller
+        yield retriever
+
+        # stop the thread and wait until it finishes
+        retriever.stop()
+        logging.getLogger("device").debug("Waiting for retriever to stop")
+        retriever.join()
+        logging.getLogger("device").info("Retriever stopped")
+
+        # close the device
         self.library.close()
 
     def stream(self):
