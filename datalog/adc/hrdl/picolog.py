@@ -61,9 +61,9 @@ class PicoLogAdcLib(AbstractHwLib):
         self._c_handle = int(self.library.HRDLOpenUnit())
 
         if not Handle.is_valid_handle(self._c_handle):
-            if self._c_handle.value is Handle.UNIT_NOT_FOUND:
+            if self._c_handle is Handle.UNIT_NOT_FOUND:
                 raise Exception('Unit not found')
-            elif self._c_handle.value is Handle.UNIT_NOT_OPENED:
+            elif self._c_handle is Handle.UNIT_NOT_OPENED:
                 raise Exception('Unit found but not opened')
             else:
                 raise Exception('Unknown invalid handle status')
