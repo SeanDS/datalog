@@ -102,6 +102,11 @@ class Retriever(threading.Thread):
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
+            if time_since_start > 100000:
+                # temporary hack: exit after 100 seconds
+                logger.debug("Exiting after 100s")
+                self.retrieving = False
+
     def stop(self):
         """Stops the ADC data stream"""
 

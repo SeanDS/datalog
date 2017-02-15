@@ -55,15 +55,22 @@ class Adc(object):
         # start the retriever thread
         retriever.start()
 
-        # return the retriever to the caller
-        yield retriever
+        # yield the retriever inside a try/finally block to handle any
+        # unexpected events
+        try:
+            # return the retriever to the caller
+            yield retriever
+        finally:
+            # stop the thread and wait until it finishes
+            retriever.stop()
+            logging.getLogger("device").debug("Waiting for retriever to stop")
+            retriever.join()
+            logging.getLogger("device").info("Retriever stopped")
 
-        # stop the thread and wait until it finishes
-        retriever.stop()
-        logging.getLogger("device").debug("Waiting for retriever to stop")
-        retriever.join()
-        logging.getLogger("device").info("Retriever stopped")
+            # close the device
+            self.close()
 
+    def close(self):
         # close the device
         self.library.close()
 
