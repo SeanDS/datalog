@@ -42,7 +42,7 @@ class Adc(object):
         return self.library.is_open()
 
     @contextmanager
-    def retriever(self, datastore):
+    def get_retriever(self, datastore):
         if not self.is_open():
             self.library.open()
 

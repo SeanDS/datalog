@@ -1,26 +1,40 @@
-from __future__ import print_function, division
-
-import os
-import sys
 import logging
 import socket
-import select
+import selectors
 import threading
 import time
 import re
-import ConfigParser
+from contextlib import contextmanager
 
-from picolog.hrdl.adc import PicoLogAdc
-from picolog.fetch import Retriever
-from picolog.data import DataStore
-from picolog.logstream import LevelBasedHandler
-from picolog.constants import Channel, VoltageRange, InputType, ConversionTime
+"""ADC networking tools."""
 
-"""
-ADC networking tools.
-"""
+"""Regular expressions"""
+REGEX_OBJ = {
+    "dataafter": re.compile("dataafter.*?(\\d{1,})"),
+    "voltsconversion": re.compile("voltsconversion.*?(\\d{1,2})")
+}
 
-class Server(object):
+@contextmanager
+def get_server(*args, **kwargs):
+    # create server
+    server = Server(*args, **kwargs)
+
+    # listen for commands over the network
+    server.start()
+
+    # yield the server inside a try/finally block to handle any
+    # unexpected events
+    try:
+        # return the server to the caller
+        yield server
+    finally:
+        # stop the thread and wait until it finishes
+        server.stop()
+        logging.getLogger("network").debug("Waiting for server to stop")
+        server.join()
+        logging.getLogger("network").info("Server stopped")
+
+class Server(threading.Thread):
     """Server to govern the ADC's data logging and storage, as well as to serve \
     connected clients.
 
@@ -28,206 +42,33 @@ class Server(object):
     can request data and other server information.
     """
 
-    """Configuration"""
-    config = None
-
-    """ADC channel configuration"""
-    channel_config = None
-
-    """Logger object"""
-    logger = None
-
-    """Socket object"""
-    _socket = None
-
-    """ADC object"""
-    _adc = None
-
-    """Retriever (to fetch stuff from ADC) object"""
-    _retriever = None
-
-    """Command strings"""
-    command = {"timestamp": "timestamp", "dataafter": "dataafter", \
-    "streamstarttimestamp": "streamstarttimestamp", "sampletime": "sampletime", \
-    "enabledchannels": "enabledchannels", "voltsconversion": "voltsconversion"}
-
-    """Regular expressions"""
-    regex = {"dataafter": "dataafter.*?(\\d{1,})", \
-        "voltsconversion": "voltsconversion.*?(\\d{1,2})"}
-    regex_objects = None
-
-    """Server running status, used by threads"""
-    server_running = None
-
-    """ADC datastore object"""
-    datastore = None
-
-    """Connected clients"""
-    _clients = None
-
     """EOF string used by Client._send_with_eof"""
     EOF_STRING = "\0"
 
-    def __init__(self, config_path=None, channel_config_path=None, \
-    info_stream=sys.stdout, error_stream=sys.stderr):
-        """Initialises the server
+    def __init__(self, config, retriever):
+        """Initialises the server"""
 
-        :param config_path: configuration path
-        :param channel_config_file: ADC channel configuration path
-        :param info_stream: stream to write info to
-        :param error_stream: stream to write errors to
-        """
+        # initialise threading
+        threading.Thread.__init__(self)
 
-        # parse configuration
-        self.parse_config(config_path)
+        self.config = config
+        self.retriever = retriever
 
-        # create logger (now that we have the config)
-        self._create_logger(info_stream, error_stream)
+    @property
+    def socket_buf_len(self):
+        return int(self.config["server"]["socket_buf_len"])
 
-        # parse the channel config
-        self.parse_channel_config(channel_config_path)
+    @property
+    def max_readings_per_request(self):
+        return int(self.config["server"]["max_readings_per_request"])
 
-        # compile regex
-        self.compile_regex()
-
-        self.logger.info("Server ready to be started")
-
-    def _create_logger(self, info_stream, error_stream):
-        """Creates a logger using the specified streams
-
-        :param info_stream: the stream to post information to
-        :param error_stream: the stream to post errors to
-        """
-
-        # create logger instance
-        self.logger = logging.getLogger('PicoLogServer')
-
-        # set minimum level
-        self.logger.setLevel(logging.INFO)
-
-        # set OS-specific logging black holes if necessary
-        if info_stream is None:
-            info_stream = open(os.devnull, "w")
-        if error_stream is None:
-            error_stream = open(os.devnull, "w")
-
-        # create log stream handler
-        log_handler = LevelBasedHandler(info_stream, error_stream)
-        log_handler.setLevel(logging.INFO)
-
-        # set formatter
-        formatter = logging.Formatter(self.config["server"]["log_format"])
-        log_handler.setFormatter(formatter)
-
-        # add stream handler to logger
-        self.logger.addHandler(log_handler)
-
-    def parse_config(self, config_path):
-        """Parses the configuration found in the specified path
-
-        :param config_path: the path to the configuration file
-        """
-
-        # create the config object
-        parser = ConfigParser.RawConfigParser()
-
-        # first of all, parse the default configuration
-        parser.read(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + \
-        "config" + os.path.sep + "config.default")
-
-        # next, parse the user-defined configuration if present
-        if config_path:
-            parser.read(config_path)
-
-        # store only the dict produced by the config parser
-        self.config = {section: dict(parser.items(section)) \
-        for section in parser.sections()}
-
-        # force some types
-        self.config["server"]["port"] = int(self.config["server"]["port"])
-        self.config["server"]["max_connections"] = \
-        int(self.config["server"]["max_connections"])
-        self.config["server"]["max_readings_per_request"] = \
-        int(self.config["server"]["max_readings_per_request"])
-        self.config["adc"]["conversion_time"] = \
-        int(self.config["adc"]["conversion_time"])
-        self.config["adc"]["sample_time"] = \
-        float(self.config["adc"]["sample_time"])
-        self.config["adc"]["socket_buffer_length"] = \
-        int(self.config["adc"]["socket_buffer_length"])
-        self.config["adc"]["fetch_delay"] = \
-        float(self.config["adc"]["fetch_delay"])
-        self.config["adc"]["max_adc_connection_attempts"] = \
-        int(self.config["adc"]["max_adc_connection_attempts"])
-        self.config["adc"]["min_adc_reconnection_delay"] = \
-        float(self.config["adc"]["min_adc_reconnection_delay"])
-        self.config["adc"]["hrdl_string_buffer_length"] = \
-        int(self.config["adc"]["hrdl_string_buffer_length"])
-        self.config["adc"]["hrdl_sample_buffer_length"] = \
-        int(self.config["adc"]["hrdl_sample_buffer_length"])
-        self.config["datastore"]["max_readings"] = \
-        int(self.config["datastore"]["max_readings"])
-
-    def parse_channel_config(self, channel_config_path):
-        """Parses the channel configuration found in the specified path
-
-        :param channel_config_path: path to channel configuration file
-        """
-
-        self.logger.info("Parsing channel config")
-
-        # instantiate parser
-        parser = ConfigParser.RawConfigParser()
-
-        # first of all, parse the default configuration
-        parser.read(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + \
-        "config" + os.path.sep + "channel_config.default")
-
-        # next, parse the user-defined configuration if present
-        if channel_config_path:
-            parser.read(channel_config_path)
-        else:
-            # no user-defined channel settings
-            self.logger.warning("No user-defined channel configuration found. \
-Cowardly carrying on.")
-
-        # store only the dict produced by the config parser
-        self.channel_config = {section: dict(parser.items(section)) \
-        for section in parser.sections()}
-
-    def compile_regex(self):
-        """Compiles built-in regex strings into Python regular expression \
-        objects"""
-
-        self.logger.info("Compiling regex handlers")
-
-        # create dict if not yet created
-        if self.regex_objects is None:
-            self.regex_objects = {}
-
-        # compile each regex string
-        for name, regex in self.regex.items():
-            self.regex_objects[name] = re.compile(regex)
-
-    def start(self):
-        """Opens a connection to the ADC and binds the server to the \
-        preconfigured socket"""
-
-        self.logger.info("Starting server")
-
-        # open ADC
-        self._open_adc()
-
-        # configure ADC
-        self._configure_adc()
-
-        # start ADC recording
-        self._stream_adc()
+    def run(self):
+        """Binds the server to the preconfigured socket"""
 
         # bind to socket
         try:
             self._bind()
-        except socket.error, e:
+        except socket.error as e:
             # convert socket error into an exception
             raise Exception(e)
 
@@ -237,144 +78,52 @@ Cowardly carrying on.")
         # set running
         self.server_running = True
 
+        logging.getLogger("network").info("Server started")
+
         # clients list
         self._clients = []
 
-        # let user know how to stop server
-        print("Press return to stop server", file=sys.stdout)
+        # create selector to interface with OS
+        sel = selectors.DefaultSelector()
 
-        # main run loop
-        while self.server_running:
-            # create queue of waitable objects
-            inputready, _, _ = select.select(\
-            [self._socket, sys.stdin], [], [])
+        # register the connection handler for when a client connects
+        sel.register(self._socket, selectors.EVENT_READ, self.handle_connection)
+        # TODO: register a listener for a stop event
 
-            for i in inputready:
-                if i is self._socket:
-                    # handle a request on the socket
-                    client = Client(self, *self._socket.accept())
-
-                    # start thread
-                    client.start()
-
-                    # add client to list
-                    self._clients.append(client)
-                elif i is sys.stdin:
-                    # handle input on stdin
-                    sys.stdin.readline()
-
-                    # an input has been detected on stdin, so stop server
-                    self.server_running = False
-
-        # stop server
-        self.stop()
-
-    def _stream_adc(self):
-        """Starts the ADC in stream (continuous measurement) mode
-
-        Also records the timestamp corresponding to the start of the stream.
-        """
-
-        # create a new datastore
-        self.datastore = DataStore(self.config["datastore"]["max_readings"])
-
-        # create a new data retriever
-        self._retriever = Retriever(self._adc, self.datastore, \
-        self.config["adc"]["fetch_delay"])
-
-        # start retrieval thread
-        self._retriever.start()
+        while True:
+            events = sel.select()
+            for key, _ in events:
+                # run the callback
+                key.data()
 
     def stop(self):
-        """Closes all open connections, including to the ADC"""
-
-        # stop ADC streaming
-        self._retriever.stop()
+        """Stops the server"""
 
         # close clients
         self._close_clients()
 
         # close socket
-        self._socket.close()
+        self._unbind()
 
-        # close ADC
-        self._close_adc()
+    def handle_connection(self):
+        # handle a request on the socket
+        client = Client(self, *self._socket.accept())
 
-        self.logger.info("Bye")
+        # start client thread
+        client.start()
+
+        logging.getLogger("server").debug("New client from "
+                                          "{0}".format(client.address))
+
+        # add client to list
+        self._clients.append(client)
 
     def _close_clients(self):
         """Closes client connections"""
 
-        if self._clients is not None:
-            for client in self._clients:
-                client.stop()
-
-    def _close_adc(self):
-        """Closes the ADC"""
-
-        if self._adc is not None:
-            self._adc.close_unit()
-
-    def get_timestamp(self):
-        """Returns the current server timestamp in milliseconds"""
-        return int(round(time.time() * 1000))
-
-    def _open_adc(self):
-        """Opens the ADC as many times as necessary"""
-
-        # ADC object
-        adc = PicoLogAdc(self.config["adc"]["hrdl_library_path"], \
-        self.config["adc"]["hrdl_string_buffer_length"], \
-        self.config["adc"]["hrdl_sample_buffer_length"], logger=self.logger)
-
-        # connection attempts
-        attempts = 0
-
-        while True:
-            # attempt to open ADC
-            try:
-                # increment attempts
-                attempts += 1
-
-                # open ADC
-                adc.open_unit()
-
-                # exit loop
-                break
-            except Exception, e:
-                # ADC reported issue
-
-                # check if we're out of attempts
-                if attempts >= self.config["adc"]["max_adc_connection_attempts"]:
-                    raise Exception("Could not open ADC after {0} attempt(s). \
-Last error: {1}".format(attempts, e))
-
-            # wait exponentially longer than last time
-            delay = self.config["adc"]["min_adc_reconnection_delay"] \
-            * attempts ** 2
-
-            self.logger.warning("Could not connect to ADC. Waiting {0}s before next \
-attempt".format(delay))
-
-            time.sleep(delay)
-
-        # save ADC object
-        self._adc = adc
-
-    def _configure_adc(self):
-        """Configures the ADC using preconfigured settings"""
-
-        # activate channels
-        for index in self.channel_config:
-            # get channel dict
-            channel = self.channel_config[index]
-
-            self._adc.set_analog_in_channel(int(channel["channel"]), \
-            bool(channel["enabled"]), int(channel["range"]), int(channel["type"]))
-
-        # set sample time, converting from s to ms
-        self._adc.set_sample_time(int(self.config["adc"]["sample_time"] * 1000), \
-        self.config["adc"]["conversion_time"])
+        for client in self._clients:
+            logging.getLogger("server").debug("Stopping client {0}".format(client))
+            client.stop()
 
     def _bind(self):
         """Binds the server to the preconfigured socket"""
@@ -382,39 +131,43 @@ attempt".format(delay))
         # instantiate socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # bind the socket to the preconfigured host and port
-        self._socket.bind((self.config["server"]["host"], \
-        self.config["server"]["port"]))
+        host = self.config["server"]["host"]
+        port = int(self.config["server"]["port"])
 
-        self.logger.info("Server bound to {0} on port {1}".format( \
-        self.config["server"]["host"], self.config["server"]["port"]))
+        # bind the socket to the preconfigured host and port
+        self._socket.bind((host, port))
+
+        logging.getLogger("server").info("Server bound to {0} on port "
+                                         "{1}".format(host, port))
+
+    def _unbind(self):
+        """Unbinds the server from the socket"""
+        self._socket.close()
+
+    def is_socket_open(self):
+        """Checks if socket is open"""
+        return self._socket is True
 
     def _listen(self):
         """Starts listening to the socket for a connection"""
 
         # listen for connections up to the preconfigured maximum
-        self._socket.listen(self.config["server"]["max_connections"])
+        self._socket.listen(int(self.config["server"]["max_connections"]))
 
-    def socket_open(self):
-        """Checks if socket is open"""
-        return self._socket is True
+    def timestamp(self):
+        """Returns the current server timestamp in milliseconds"""
+        return int(round(time.time() * 1000))
+
+    def device_stream_start_timestamp(self):
+        return int(self.retriever.start_time)
 
 class Client(threading.Thread):
     """Client able to handle simple commands"""
 
-    """Server object"""
-    server = None
-
-    """Connection object"""
-    connection = None
-
-    """Client address"""
-    address = None
-
     def __init__(self, server, connection, address):
         """Initialises the client
 
-        :param server: the server this client is connected to
+        :param server: server associated with the client connection
         :param connection: the connection object to send/receive commands
         :param address: the address of the client
         """
@@ -426,48 +179,48 @@ class Client(threading.Thread):
         self.connection = connection
         self.address = address
 
-        self.server.logger.debug("Connection from {0}".format(address))
+    def __str__(self):
+        return "<{0}>".format(str(self.address))
+
+    def __repr__(self):
+        return str(self)
 
     def run(self):
         """Runs the client thread"""
 
-        # receive message
-        data = self.connection.recv( \
-        self.server.config["adc"]["socket_buffer_length"])
-
-        self._handle(data)
+        # receive and handle message
+        self.handle(self.connection.recv(self.server.socket_buf_len).decode("utf-8"))
 
     def stop(self):
+        # close client connection
         self.connection.close()
 
-    def _handle(self, data):
+    def handle(self, data):
         """Handles a request made across the socket
 
         :param data: data sent by client
         """
 
-        self.server.logger.debug("Received message: \"{0}\"".format(data))
+        logging.getLogger("client").debug("Received message: "
+                                          "\"{0}\"".format(data))
 
         try:
-            if data == self.server.command["timestamp"]:
-                self._send_timestamp()
-            elif data == self.server.command["sampletime"]:
-                self._send_adc_sample_time()
-            elif data == self.server.command["streamstarttimestamp"]:
-                self._send_stream_start_timestamp()
-            elif data == self.server.command["enabledchannels"]:
-                self._send_enabled_channels()
-            elif data.startswith(self.server.command["dataafter"]):
-                self._handle_command_data_after(data)
-            elif data.startswith(self.server.command["voltsconversion"]):
-                self._handle_command_volts_conversion(data)
-        except Exception, e:
-            self.server.logger.error(str(e))
-            self._send_error_message(str(e))
+            if data == "timestamp":
+                self.send_timestamp()
+            elif data == "starttimestamp":
+                self.send_stream_start_timestamp()
+            elif data.startswith("dataafter"):
+                self.handle_command_data_after(data)
+            elif data.startswith("voltsconversion"):
+                self.handle_command_volts_conversion(data)
+        except Exception as e:
+            logging.getLogger("client").error(str(e))
+            self.send_error_message(str(e))
 
+        # close connection
         self.stop()
 
-        self.server.logger.debug("Connection closed")
+        logging.getLogger("client").debug("Connection closed")
 
     def _send(self, message):
         """Sends the specified message to the client ending with the predefined \
@@ -476,9 +229,9 @@ class Client(threading.Thread):
         :param message: message to send
         """
 
-        self.connection.send(message + Server.EOF_STRING)
+        self.connection.send("{0}{1}".format(message, Server.EOF_STRING).encode("utf-8"))
 
-    def _send_error_message(self, message):
+    def send_error_message(self, message):
         """Sends the client the specified error message
 
         :param message: error message
@@ -486,27 +239,17 @@ class Client(threading.Thread):
 
         self._send(message)
 
-    def _send_timestamp(self):
+    def send_timestamp(self):
         """Sends the current timestamp to the connected client"""
-        self.server.logger.debug("Sending timestamp")
-        self._send(str(self.server.get_timestamp()))
+        logging.getLogger("client").debug("Sending timestamp")
+        self._send(str(self.server.timestamp()))
 
-    def _send_stream_start_timestamp(self):
+    def send_stream_start_timestamp(self):
         """Sends the stream start timestamp to the connected client"""
-        self.server.logger.debug("Sending stream start timestamp")
-        self._send(str(self.server._adc.stream_start_timestamp))
+        logging.getLogger("client").debug("Sending stream start timestamp")
+        self._send(str(self.server.device_stream_start_timestamp()))
 
-    def _send_enabled_channels(self):
-        """Sends a comma separated list of the enabled channels"""
-        self.server.logger.debug("Sending list of enabled channels")
-        self._send(",".join([str(channel) for channel in self.server._adc.enabled_channels]))
-
-    def _send_adc_sample_time(self):
-        """Sends the ADC sample time"""
-        self.server.logger.debug("Sending ADC sample time")
-        self._send(str(self.server._adc.sample_time))
-
-    def _handle_command_data_after(self, data):
+    def handle_command_data_after(self, data):
         """Handles a 'dataafter' command
 
         The command should be "dataafter <time> <buffer length>" where <time> \
@@ -518,8 +261,7 @@ class Client(threading.Thread):
         """
 
         # match timestamp in data
-        search = self.server.regex_objects[\
-        self.server.command["dataafter"]].search(data)
+        search = REGEX_OBJ["dataafter"].search(data)
 
         # if no matches, raise exception
         if search is None:
@@ -529,22 +271,23 @@ class Client(threading.Thread):
         timestamp = int(search.group(1))
 
         # send the data
-        self._send_data_after(timestamp)
+        self.send_data_after(timestamp)
 
-    def _send_data_after(self, timestamp):
+    def send_data_after(self, timestamp):
         """Sends the data collected since the specified timestamp
 
         :param timestamp: timestamp to send data since
         """
 
         # get readings
-        datastore = self.server.datastore.find_readings_after(timestamp, \
-        max_readings=self.server.config["server"]["max_readings_per_request"])
+        datastore = self.server.retriever.datastore.find_readings_after( \
+            timestamp,
+            max_readings=self.server.max_readings_per_request)
 
         # send readings
         self._send(datastore.json_repr())
 
-    def _handle_command_volts_conversion(self, data):
+    def handle_command_volts_conversion(self, data):
         """Handles a 'voltsconversion' command
 
         The command should be "voltsconversion <channel>" where <channel> is a
@@ -556,8 +299,7 @@ class Client(threading.Thread):
         """
 
         # match channel in data
-        search = self.server.regex_objects[\
-        self.server.command["voltsconversion"]].search(data)
+        search = REGEX_OBJ["voltsconversion"].search(data)
 
         # if no matches, raise exception
         if search is None:
@@ -567,35 +309,22 @@ class Client(threading.Thread):
         channel = int(search.group(1))
 
         # send the data
-        self._send_conversion_factor(channel)
+        self.send_conversion_factor(channel)
 
-    def _send_conversion_factor(self, channel):
+    def send_conversion_factor(self, channel):
         """Sends the voltage conversion factor for the specified channel
 
         :param channel: the channel to fetch the conversion for
         """
 
-        self._send( \
-        str(self.server._adc.get_volts_conversion(channel)))
+        # FIXME: implement this!
+        self._send("not implemented yet")
 
 class ServerSocket(object):
     """Provides a socket interface to the ADC server."""
 
-    """Host"""
-    host = None
-
-    """Port"""
-    port = None
-
-    """Response receive buffer size"""
-    buffer_length = None
-
-    """Timeout for receiving response from server"""
-    timeout = None
-
     def __init__(self, host, port, buffer_length=4096, timeout=5):
         """Initialises the socket server
-
         :param host: the host to connect to
         :param port: the port to connect to
         :param buffer: the buffer length to use to receive server responses
@@ -628,9 +357,7 @@ class ServerSocket(object):
     def get_command_response(self, command):
         """Connects to the server, sends it the specified command and returns \
         the response
-
         This function correctly handles the EOF character sent by the server.
-
         :param command: the command to send to the server
         :raises Exception: if server times out
         """
@@ -639,7 +366,7 @@ class ServerSocket(object):
         connection = self.get_connection()
 
         # send command
-        connection.send(command)
+        connection.sendall(command.encode("utf-8"))
 
         # empty client message
         message = ""
@@ -649,7 +376,7 @@ class ServerSocket(object):
 
         while True:
             # get next chunk
-            message += connection.recv(self.buffer_length)
+            message += connection.recv(self.buffer_length).decode("utf-8")
 
             # check for EOF
             if message[-1] is Server.EOF_STRING:
