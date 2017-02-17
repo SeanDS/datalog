@@ -1,5 +1,6 @@
 import logging
 import socket
+import io
 import selectors
 import threading
 import time
@@ -88,22 +89,28 @@ class Server(threading.Thread):
 
         # register the connection handler for when a client connects
         sel.register(self._socket, selectors.EVENT_READ, self.handle_connection)
-        # TODO: register a listener for a stop event
 
-        while True:
-            events = sel.select()
+        self.server_running = True
+
+        while self.server_running:
+            # select events, with a 1 second maximum wait
+            events = sel.select(timeout=1)
+
+            # loop over events, if any
             for key, _ in events:
                 # run the callback
                 key.data()
-
-    def stop(self):
-        """Stops the server"""
 
         # close clients
         self._close_clients()
 
         # close socket
         self._unbind()
+
+    def stop(self):
+        """Stops the server"""
+
+        self.server_running = False
 
     def handle_connection(self):
         # handle a request on the socket
