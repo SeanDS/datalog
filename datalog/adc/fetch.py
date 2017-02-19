@@ -72,7 +72,7 @@ class Retriever(threading.Thread):
             logger.debug("+{0} polling ADC".format(time_since_start))
 
             # check if ADC has values to retrieve
-            if self.adc.readings_available():
+            if self.adc.ready():
                 # get readings
                 readings = self.adc.get_readings()
 

@@ -4,8 +4,9 @@ from collections import deque
 
 """Data representation classes."""
 
+
 class Reading(object):
-    """Class to represent an ADC reading for a particular time. This contains
+    """Class to represent a device reading for a particular time. This contains
     the samples for each active channel in the ADC for a particular time."""
 
     """Reading time"""

@@ -1,50 +1,63 @@
+"""Abstract ADC device classes"""
+
 import logging
 import abc
-from configparser import ConfigParser
 from contextlib import contextmanager
-import collections
 
+from datalog.device import Device
 from datalog.data import Reading
-from datalog.adc.fetch import Retriever
+from .fetch import Retriever
 
-class Adc(object):
+
+class Adc(Device, metaclass=abc.ABCMeta):
     """Represents ADC hardware"""
 
-    def __init__(self, config):
+    def __init__(self, config, *args, **kwargs):
         """Initialises the ADC interface
 
-        :param config: path to config file, or list of paths to config files, \
-        which will be parsed to provide contextual settings
+        :param config: dict-like config object
         """
+
+        super(Adc, self).__init__(*args, **kwargs)
 
         self.config = config
 
-        # load ADC library
-        self._load_library()
+        # enabled channel numbers
+        self.enabled_channels = set()
 
-    def _load_library(self):
-        """Loads the ADC unit library, either hardware or emulated"""
+    @classmethod
+    def load_from_config(cls, config):
+        """Loads the appropriate ADC class given the settings in the specified \
+        config file
+
+        :param config: dict-like config object
+        """
 
         logging.getLogger("adc").info("Loading ADC driver")
 
         # import libraries now that they are needed
         # (doing this earlier can lead to circular imports)
-        from datalog.adc.hrdl.picolog import PicoLogAdcLib, PicoLogAdcLibSim
+        from datalog.adc.hrdl.picolog import PicoLogAdc24, PicoLogAdc24Sim
 
-        if self.config['device']['type'] == 'PicoLog24':
-            self.library = PicoLogAdcLib(self.config)
-        elif self.config['device']['type'] == 'PicoLog24Sim':
-            self.library = PicoLogAdcLibSim(self.config)
-        else:
-            raise ValueError('Unrecognised unit type')
+        if config['adc']['type'] == 'PicoLog24':
+            return PicoLogAdc24(config)
+        elif config['adc']['type'] == 'PicoLog24Sim':
+            return PicoLogAdc24Sim(config)
 
-    def is_open(self):
-        return self.library.is_open()
+        ValueError('Unrecognised unit type')
 
     @contextmanager
     def get_retriever(self, datastore):
+        """Get a :class:`Retriever` for the ADC to poll for readings on a \
+        regular interval
+
+        :param datastore: :class:`~datalog.data.DataStore` to send readings to
+        """
         if not self.is_open():
-            self.library.open()
+            self.open()
+
+        # configure device
+        self.configure()
 
         # create the retriever
         retriever = Retriever(self, datastore, self.config)
@@ -63,38 +76,19 @@ class Adc(object):
         finally:
             # stop the thread and wait until it finishes
             retriever.stop()
-            logging.getLogger("device").debug("Waiting for retriever to stop")
+            logging.getLogger("adc").debug("Waiting for retriever to stop")
             retriever.join()
-            logging.getLogger("device").info("Retriever stopped")
+            logging.getLogger("adc").info("Retriever stopped")
 
             # close the device
             self.close()
 
-    def close(self):
-        # close the device
-        self.library.close()
-
-    def stream(self):
-        self.library.configure()
-
-        # start stream
-        self.library.stream()
-
-    def readings_available(self):
-        return self.library.ready()
-
-    def get_readings(self):
-        return self.library.get_readings()
-
-class AbstractHwLib(object, metaclass=abc.ABCMeta):
-    """Required interfaces for ADC hardware or emulated software"""
-
-    def __init__(self):
-        # enabled channel numbers
-        self.enabled_channels = set()
-
     @abc.abstractmethod
     def open(self):
+        raise NotImplemented()
+
+    @abc.abstractmethod
+    def stream(self):
         raise NotImplemented()
 
     @abc.abstractmethod

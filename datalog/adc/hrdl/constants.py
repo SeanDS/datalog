@@ -4,9 +4,24 @@ class Handle(object):
 
     @classmethod
     def is_valid_handle(cls, handle):
-        if isinstance(handle, int):
-            if handle > cls.UNIT_NOT_FOUND:
-                return True
+        if handle > cls.UNIT_NOT_FOUND:
+            return True
+
+        return False
+
+class Status(object):
+    INVALID = 0
+    VALID   = 1
+
+    @classmethod
+    def is_valid_status(cls, status):
+        """Checks if specified status is valid
+
+        :param status: status to validate
+        :return: True if valid, False otherwise"""
+
+        if status is cls.VALID:
+            return True
 
         return False
 
@@ -152,22 +167,6 @@ for a single asynchronous operation", 8: "Communication failed", \
         # otherwise it's an error
         return True
 
-class Status(object):
-    INVALID = 0
-    VALID   = 1
-
-    @classmethod
-    def is_valid_status(cls, status):
-        """Checks if specified status is valid
-
-        :param status: status to validate
-        :return: True if valid, False otherwise"""
-
-        if status is cls.VALID:
-            return True
-
-        return False
-
 class Progress(object):
     OPEN_PROGRESS_FAIL     = -1
     OPEN_PROGRESS_PENDING  = 0
@@ -218,7 +217,7 @@ class ConversionTime(object):
     TIME_660MS = 4
     TIME_MIN   = TIME_60MS
     TIME_MAX   = TIME_660MS
-    
+
     """Conversion times in ms"""
     times = {TIME_60MS: 60, TIME_100MS: 100, TIME_180MS: 180, TIME_340MS: 340, TIME_660MS: 660}
 
@@ -227,7 +226,7 @@ class ConversionTime(object):
         """Checks if the specified conversion time is valid"""
         return conversion_time >= cls.TIME_MIN \
         and conversion_time <= cls.TIME_MAX
-    
+
     @classmethod
     def get_conversion_time(cls, conversion_time):
         """Returns the conversion time in ms for the specified identifier"""
