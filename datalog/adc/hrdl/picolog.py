@@ -23,15 +23,45 @@ class PicoLogAdc24(Adc):
         self.config = config
 
         # default handle
-        self._c_handle = None
+        self.handle = None
 
         # string, times and values buffers
-        self.str_buf = ctypes.create_string_buffer( \
+        self._c_str_buf = ctypes.create_string_buffer( \
                         int(self.config['device']['str_buf_len']))
-        self.sample_times = (ctypes.c_long \
+        self._c_sample_times = (ctypes.c_int32 \
                             * int(self.config['device']['sample_buf_len']))()
-        self.sample_values = (ctypes.c_long \
+        self._c_sample_values = (ctypes.c_int32 \
                             * int(self.config['device']['sample_buf_len']))()
+
+        # buffer length values
+        self._c_str_buf_len = ctypes.c_int16(len(self._c_str_buf))
+        self._c_sample_buf_len = ctypes.c_int32(len(self._c_sample_times))
+
+        # info type
+        self._c_info_type = ctypes.c_int16()
+
+        # C short to store number of channels
+        self._c_enabled_channels = ctypes.c_int16()
+
+        # C long for min/max ADC counts
+        self._c_minimum_count = ctypes.c_int32()
+        self._c_maximum_count = ctypes.c_int32()
+
+        # C shorts for channel info
+        self._c_channel = ctypes.c_int16()
+        self._c_channel_enabled = ctypes.c_int16()
+        self._c_channel_vrange = ctypes.c_int16()
+        self._c_channel_itype = ctypes.c_int16()
+
+        # sample/conversion times
+        self._c_sample_time = ctypes.c_int32()
+        self._c_conversion_time = ctypes.c_int16()
+
+        # number of samples to take
+        self._c_num_samples = ctypes.c_int32()
+
+        # sample method
+        self._c_sample_method = ctypes.c_int16()
 
         # default channel voltages
         self.channel_voltages = {i: self.DEFAULT_CHANNEL_VOLTAGE \
@@ -54,37 +84,37 @@ class PicoLogAdc24(Adc):
     def open(self):
         """Opens the PicoLog unit for communication"""
 
-        if self._c_handle is not None:
+        if self.handle is not None:
             raise Exception("Only one PicoLog unit can be opened at a time")
 
         # open unit and store handle as C short
-        self._c_handle = self._hrdl_open()
+        self.handle = self._hrdl_open()
 
-        if not Handle.is_valid_handle(self._c_handle.value):
-            if self._c_handle.value == Handle.UNIT_NOT_FOUND:
+        if not Handle.is_valid_handle(self.handle):
+            if self.handle.value == Handle.UNIT_NOT_FOUND:
                 raise Exception('Unit not found')
-            elif self._c_handle.value == Handle.UNIT_NOT_OPENED:
+            elif self.handle.value == Handle.UNIT_NOT_OPENED:
                 raise Exception('Unit found but not opened')
             else:
                 raise Exception('Unknown invalid handle status')
 
-        logging.getLogger("picolog").info("Unit opened with handle {0}".format(self._c_handle.value))
+        logging.getLogger("picolog").info("Unit opened with handle {0}".format(self.handle))
 
     def close(self):
         """Closes the currently open PicoLog unit"""
 
-        if self._c_handle is None:
+        if self.handle is None:
             raise Exception("No PicoLog unit is currently open")
 
         # close, recording status
-        status = int(self._hrdl_close(self._c_handle).value)
+        status = self._hrdl_close(self.handle)
 
         # check return status
         if not Status.is_valid_status(status):
             raise Exception('Invalid handle passed to unit')
 
         # reset handle
-        self._c_handle = None
+        self.handle = None
 
         logging.getLogger("picolog").info("Unit closed")
 
@@ -93,16 +123,37 @@ class PicoLogAdc24(Adc):
         self.set_sample_time(int(self.config['device']['sample_time']), \
             int(self.config['device']['conversion_time']))
 
-        # TODO: set up the channels properly
-        self.set_analog_in_channel(
-            11,
-            True,
-            VoltageRange.RANGE_2500_MV,
-            InputType.SINGLE)
+        # picolog configuration and keys
+        cfg = self.config["picolog"]
+        cfg_keys = cfg.keys()
+
+        # set up channels
+        for i in range(1, self.NUM_CHANNELS + 1):
+            cfg_channel = "channel_{0:d}".format(i)
+            if cfg_channel in cfg_keys:
+                if not bool(cfg[cfg_channel]):
+                    # channel disabled
+                    continue
+
+                channel = int(i)
+
+                cfg_channel_range = "channel_{0:d}_range".format(i)
+                if cfg_channel_range in cfg_keys:
+                    vrange = int(cfg[cfg_channel_range])
+                else:
+                    vrange = self.DEFAULT_CHANNEL_VOLTAGE
+
+                cfg_channel_type = "channel_{0:d}_type".format(i)
+                if cfg_channel_type in cfg_keys:
+                    itype = int(cfg[cfg_channel_type])
+                else:
+                    itype = self.DEFAULT_CHANNEL_TYPE
+
+                self.set_analog_in_channel(channel, True, vrange, itype)
 
     def is_open(self):
         """Checks if the unit is open"""
-        return self._c_handle is not None
+        return self.handle is not None
 
     def ready(self):
         """Checks if the unit has readings ready to be retrieved
@@ -113,7 +164,7 @@ class PicoLogAdc24(Adc):
         :return: ready status
         """
 
-        return int(self._hrdl_ready(self._c_handle).value)
+        return self._hrdl_ready(self.handle)
 
     def get_unit_info(self, info_type):
         """Fetches the specified information from the unit
@@ -125,29 +176,27 @@ class PicoLogAdc24(Adc):
 
         logging.getLogger("picolog").debug("Getting unit info")
 
-        # validate info type
-        info_type = int(info_type)
+        # set info type
+        self._c_info_type.value = int(info_type)
 
         # check info type validity
         if not Info.is_valid_constant(info_type):
             raise Exception('Invalid info constant')
 
         # get unit info, returning number of characters written to buffer
-        length = int(self._hrdl_get_unit_info(
-                    self._c_handle,
-                    ctypes.pointer(self.str_buf),
-                    ctypes.c_short(len(self.str_buf)),
-                    info_type).value)
+        length = self._hrdl_get_unit_info(
+                    self.handle,
+                    ctypes.pointer(self._c_str_buf),
+                    self._c_str_buf_len,
+                    self._c_info_type)
 
         # length is zero if one of the parameters specified in the function call
         # above is out of range, or a null message pointer is specified
         if length is 0:
             raise Exception('Info type out of range or null message pointer')
-        elif length >= len(self.str_buf):
-            logging.getLogger("picolog").warning("Buffer length reached or exceeded")
 
         # extract and return string from buffer
-        return str(self.str_buf.value[:length])
+        return self._c_str_buf.value[:length].decode("utf-8")
 
     def get_formatted_unit_info(self, info_type):
         """Fetches the specified information from the unit, with context
@@ -214,7 +263,7 @@ class PicoLogAdc24(Adc):
         logging.getLogger("picolog").debug("Checking for error")
 
         # check for errors
-        error = self.get_last_error()
+        error = self.get_last_error_code()
 
         if Error.is_error(error):
             raise Exception("Error: {0}".format(Error.get_error_string(error)))
@@ -228,7 +277,7 @@ class PicoLogAdc24(Adc):
         logging.getLogger("picolog").debug("Checking for settings error")
 
         # check for settings errors
-        settings_error = self.get_last_settings_error()
+        settings_error = self.get_last_settings_error_code()
 
         if SettingsError.is_error(settings_error):
             raise Exception("Settings error: {0}".format( \
@@ -259,12 +308,6 @@ class PicoLogAdc24(Adc):
         if not InputType.is_valid(itype):
             raise Exception("Invalid input type")
 
-        # change enabled to integer
-        enabled = int(enabled)
-
-        vrange = int(vrange)
-        itype = int(itype)
-
         # print warning to user if differential input is specified on an even
         # channel
         if itype is InputType.DIFFERENTIAL and channel % 2 == 0:
@@ -272,12 +315,22 @@ class PicoLogAdc24(Adc):
             "a secondary channel is not possible. Instead set the input on the"
             " primary channel number.")
 
+        channel = int(channel)
+        enabled = int(enabled)
+        vrange = int(vrange)
+        itype = int(itype)
+
+        # set channel info
+        self._c_channel.value = channel
+        self._c_channel_enabled.value = enabled
+        self._c_channel_vrange.value = vrange
+        self._c_channel_itype.value = itype
+
         # set the channel
-        status = int( \
-                    self._hrdl_set_analog_in_channel(self._c_handle,
-                        ctypes.c_short(channel), ctypes.c_short(enabled),
-                        ctypes.c_short(vrange), ctypes.c_short(itype)
-                    ).value)
+        status = self._hrdl_set_analog_in_channel(self.handle,
+                    self._c_channel, self._c_channel_enabled,
+                    self._c_channel_vrange, self._c_channel_itype
+                  )
 
         # check return status
         if not Status.is_valid_status(status):
@@ -313,14 +366,22 @@ class PicoLogAdc24(Adc):
         """
 
         sample_time = int(sample_time)
+        conversion_time = int(conversion_time)
 
         # check validity of conversion time
         if not ConversionTime.is_valid(conversion_time):
             raise Exception("Invalid conversion time")
 
+        # set sample and conversion times
+        self._c_sample_time.value = sample_time
+        self._c_conversion_time.value = conversion_time
+
         # set sample time
-        status = int(self.lib.HRDLSetInterval(self._c_handle, \
-            ctypes.c_long(sample_time), ctypes.c_short(conversion_time)))
+        status = self._hrdl_set_interval(
+                    self.handle,
+                    self._c_sample_time,
+                    self._c_conversion_time
+                )
 
         # check return status
         if not Status.is_valid_status(status):
@@ -344,13 +405,15 @@ class PicoLogAdc24(Adc):
         if not SampleMethod.is_valid(sample_method):
             raise Exception("Invalid sample method")
 
+        # set sample method
+        self._c_sample_method.value = int(sample_method)
+
         # run
-        status = int(
-            self.lib.HRDLRun(
-                self._c_handle,
-                ctypes.c_long(int(self.config['device']['sample_buf_len'])),
-                ctypes.c_short(sample_method)
-            ).value)
+        status = self._hrdl_run(
+                    self.handle,
+                    self._c_sample_buf_len,
+                    self._c_sample_method
+                 )
 
         # check return status
         if not Status.is_valid_status(status):
@@ -381,6 +444,9 @@ class PicoLogAdc24(Adc):
         # empty list of readings
         readings = []
 
+        # order the channels set
+        ordered_channels = sorted(self.enabled_channels)
+
         # loop over times, adding readings
         for time, data in zip(times, samples):
             time = int(time)
@@ -393,7 +459,7 @@ class PicoLogAdc24(Adc):
             # convert time from ms since stream start to UNIX timestamp (in ms)
             real_time = self.stream_start_timestamp + time
 
-            readings.append(Reading(real_time, self.enabled_channels, data))
+            readings.append(Reading(real_time, ordered_channels, data))
 
         return readings
 
@@ -405,13 +471,13 @@ class PicoLogAdc24(Adc):
                             // len(self.enabled_channels)
 
         # get samples, without using the overflow short parameter (None == NULL)
-        num_values = int(
-            self.lib.HRDLGetTimesAndValues(self._c_handle,
-                ctypes.pointer(self.sample_times),
-                ctypes.pointer(self.sample_values),
-                None,
-                ctypes.c_long(samples_per_channel)
-            ))
+        num_values = self._hrdl_get_times_and_values(
+                        self.handle,
+                        ctypes.pointer(self._c_sample_times),
+                        ctypes.pointer(self._c_sample_values),
+                        None,
+                        ctypes.c_long(samples_per_channel)
+                     )
 
         # check return status
         if num_values is 0:
@@ -456,13 +522,18 @@ class PicoLogAdc24(Adc):
 
         return times, values
 
-    def _sample_lists(self, num_values):
+    def _sample_lists(self, num_samples):
         """Converts time and value C buffers into Python lists"""
+
+        num_samples = int(num_samples)
+
+        # number of values is the number of samples * number of enabled channels
+        num_values = num_samples * len(self.enabled_channels)
 
         # convert to list and return
         # NOTE: the conversion from c_long elements to ints is done by the slice operation
-        times = [int(i) for i in self.sample_times[:num_values]]
-        values = [int(i) for i in self.sample_values[:num_values]]
+        times = [int(i) for i in self._c_sample_times[:num_samples]]
+        values = [int(i) for i in self._c_sample_values[:num_values]]
 
         return times, values
 
@@ -474,22 +545,18 @@ class PicoLogAdc24(Adc):
 
         logging.getLogger("picolog").debug("Fetching enabled channel count")
 
-        # C short to store number of channels
-        enabled_channels = ctypes.c_short()
-
         # get enabled channel count
-        status = int( \
-            self.lib.HRDLGetNumberOfEnabledChannels( \
-                self._c_handle, \
-                ctypes.pointer(enabled_channels) \
-            ).value)
+        status = self._hrdl_get_number_of_enabled_channels(
+                    self.handle,
+                    ctypes.pointer(self._c_enabled_channels)
+                 )
 
         # check return status
         if not Status.is_valid_status(status):
             raise Exception('Invalid handle passed to unit')
 
         # return enabled channels
-        return int(enabled_channels.value)
+        return int(self._c_enabled_channels.value)
 
     def _get_channel_max_voltage(self, channel):
         """Returns the maximum voltage input for the specified channel
@@ -519,19 +586,16 @@ class PicoLogAdc24(Adc):
         logging.getLogger("picolog").debug("Fetching min/max ADC counts for "
             "channel {0}".format(channel))
 
-        # C long for minimum ADC count
-        minimum = ctypes.c_long()
-
-        # C long for maximum ADC count
-        maximum = ctypes.c_long()
+        # set channel
+        self._c_channel.value = int(channel)
 
         # get minimum and maximum counts
-        status = int(
-            self.lib.HRDLGetMinMaxAdcCounts( \
-                self._c_handle, ctypes.pointer(minimum), \
-                ctypes.pointer(maximum), \
-                ctypes.c_short(channel) \
-            ).value)
+        status = self._hrdl_get_min_max_adc_counts(
+                    self.handle,
+                    ctypes.pointer(self._c_minimum_count),
+                    ctypes.pointer(self._c_maximum_count),
+                    self._c_channel
+                 )
 
         # check return status
         if not Status.is_valid_status(status):
@@ -541,22 +605,44 @@ class PicoLogAdc24(Adc):
         return (int(minimum.value), int(maximum.value))
 
     def _hrdl_open(self):
-        return self.lib.HRDLOpenUnit()
+        return int(self.lib.HRDLOpenUnit())
 
     def _hrdl_close(self, handle):
-        return self.lib.HRDLCloseUnit(handle)
+        return int(self.lib.HRDLCloseUnit(handle))
 
     def _hrdl_ready(self, handle):
-        return self.lib.HRDLReady(handle)
+        return int(self.lib.HRDLReady(handle))
 
     def _hrdl_get_unit_info(self, handle, pnt_str_buf, len_str_buf, info_type):
-        return self.lib.HRDLGetUnitInfo(handle, pnt_str_buf, len_str_buf, info_type)
+        return int(self.lib.HRDLGetUnitInfo(handle, pnt_str_buf, len_str_buf, info_type))
 
     def _hrdl_set_analog_in_channel(self, handle, channel, enabled, vrange, itype):
-        return self.lib.HRDLSetAnalogInChannel(handle, channel, enabled, vrange, itype)
+        return int(self.lib.HRDLSetAnalogInChannel(handle, channel, enabled, vrange, itype))
+
+    def _hrdl_set_interval(self, handle, sample_time, conversion_time):
+        return int(self.lib.HRDLSetInterval(handle, sample_time, conversion_time))
+
+    def _hrdl_run(self, handle, sample_buf_len, sample_method):
+        return int(self.lib.HRDLRun(handle, sample_buf_len, sample_method))
+
+    def _hrdl_get_times_and_values(self, handle, pnt_sample_times,
+                                    pnt_sample_values, pnt_overflow,
+                                    samples_per_channel):
+        return int(self.lib.HRDLGetTimesAndValues(
+            handle,
+            pnt_sample_times,
+            pnt_sample_values,
+            pnt_overflow,
+            samples_per_channel))
+
+    def _hrdl_get_number_of_enabled_channels(self, handle, ptr_enabled_channels):
+        return int(self.lib.HRDLGetNumberOfEnabledChannels(handle, ptr_enabled_channels))
+
+    def _hrdl_get_min_max_adc_counts(self, handle, ptr_min_count, ptr_max_count, channel):
+        return int(self.lib.HRDLGetMinMaxAdcCounts(handle, ptr_min_count, ptr_max_count, channel))
 
 class PicoLogAdc24Sim(PicoLogAdc24):
-    """Represents a simulated :class:`PicoLogAdcLib`."""
+    """Represents a simulated :class:`PicoLogAdc24`."""
 
     # maximum string buffer (guess)
     MAX_BUF_LEN = 2 ** 32 / 2 - 1
@@ -591,18 +677,6 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # no library to load
         return None
 
-    def configure(self):
-        # set the sample rates
-        self.set_sample_time(int(self.config['device']['sample_time']), \
-            int(self.config['device']['conversion_time']))
-
-        # TODO: set up the channels properly
-        self.set_analog_in_channel(
-            1,
-            True,
-            VoltageRange.RANGE_2500_MV,
-            InputType.SINGLE)
-
     def _generate_fake_samples(self):
         """Generates fake samples to cover the time since the last data \
         retrieval"""
@@ -630,100 +704,25 @@ class PicoLogAdc24Sim(PicoLogAdc24):
             [start_offset + self.sample_time * t for t in range(num_samples)])
         self._fake_samples_value_buf.extend( \
             [[int(random.uniform(self.MIN_COUNT, self.MAX_COUNT)) for i in \
-            range(self.get_enabled_channels_count())] for j in range(num_samples)])
+            range(len(self.enabled_channels))] for j in range(num_samples)])
 
         # reset stopwatch
         self._last_fake_request_time = last_request_time \
                                     + num_samples * self.sample_time
 
-    def set_sample_time(self, sample_time, conversion_time):
-        logging.getLogger("picolog").debug("Setting fake sample and conversion times")
-
-        sample_time = int(sample_time)
-
-        # check validity of conversion time
-        if not ConversionTime.is_valid(conversion_time):
-            raise Exception("Invalid conversion time")
-
-        # get conversion time in ms
-        conversion_time_ms = ConversionTime.get_conversion_time(conversion_time)
-
-        # samples must be able to be made within the total sample time
-        if self.get_enabled_channels_count() * conversion_time_ms \
-            > sample_time:
-            # settings error
-            self._settings_error_code = SettingsError.CONVERSION_TIME_TOO_SLOW
-            status = 0
-        # sample time must not be out of range
-        elif sample_time > self.MAX_SAMPLE_TIME:
-            self._settings_error_code = SettingsError.SAMPLE_INTERVAL_OUT_OF_RANGE
-            status = 0
-        else:
-            # success
-            self._settings_error_code = SettingsError.OK
-            status = 1
-
-        # check return status
-        if not Status.is_valid_status(status):
-            # setting failure
-            self.raise_unit_settings_error()
-
-        # save sample and conversion times
-        self.sample_time = sample_time
-        self.conversion_time = conversion_time_ms
-
-        logging.getLogger("picolog").debug("Fake sample time set to {0}, conversion "
-            "time set to {1}".format(sample_time, conversion_time_ms))
-
     def stream(self):
-        """Streams data from the unit"""
+        # call parent
+        super(PicoLogAdc24Sim, self).stream()
 
-        if self.sample_time is None:
-            raise Exception("Sample time not set")
-
-        logging.getLogger("picolog").info("Starting fake unit streaming")
-
-        if int(self.config['device']['sample_buf_len']) > self.MAX_BUF_LEN:
-            # sample buffer length out of range
-            self._settings_error_code = SettingsError.INVALID_PARAMETER
-            self.raise_unit_error()
-
-        # save timestamp
-        self.stream_start_timestamp = int(round(time.time() * 1000))
-
-        # time to use for readings
+        # set the time to use for readings
         self._last_fake_request_time = self.stream_start_timestamp
 
-    def _get_payload(self):
-        """Fetches uncollected sample payload from the unit"""
-
-        # copy the fake samples and times
-        times = list(self._fake_samples_time_buf)
-        values = list(self._fake_samples_value_buf)
-
-        # reset buffers
-        self._fake_samples_time_buf = []
-        self._fake_samples_value_buf = []
-
-        return times, values
-
-    def get_enabled_channels_count(self):
-        return len(self.enabled_channels)
-
-    def _get_min_max_adc_counts(self, channel):
-        return self.MIN_COUNT, self.MAX_COUNT
-
-    def _get_channel_max_voltage(self, channel):
-        channel = int(channel)
-
-        return VoltageRange.get_max_voltage(self.channel_voltages[channel])
-
     def _hrdl_open(self):
-        return ctypes.c_int16(999)
+        return 1
 
     def _hrdl_close(self, handle):
         # success
-        return ctypes.c_int16(1)
+        return 1
 
     def _hrdl_ready(self, handle):
         """Checks if the unit has readings ready to be retrieved"""
@@ -731,11 +730,9 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         self._generate_fake_samples()
 
         if len(self._fake_samples_time_buf) > 0:
-            flag = 1
-        else:
-            flag = 0
+            return 1
 
-        return ctypes.c_int16(flag)
+        return 0
 
     def _hrdl_get_unit_info(self, handle, pnt_str_buf, len_str_buf, info_type):
         if pnt_str_buf is None:
@@ -743,7 +740,7 @@ class PicoLogAdc24Sim(PicoLogAdc24):
             return 0
 
         # validate info type
-        info_type = int(info_type)
+        info_type = int(info_type.value)
 
         # check info type validity
         if not Info.is_valid_constant(info_type):
@@ -753,9 +750,9 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # return info
         # examples from hardware manual
         if info_type == Info.DRIVER_VERSION:
-            info = "1.0.0.1"
+            info = "Fake HRDL Driver, 1.0.0.0"
         elif info_type == Info.USB_VERSION:
-            info = "1.1"
+            info = "USB 1.1"
         elif info_type == Info.HARDWARE_VERSION:
             info = "1"
         elif info_type == Info.VARIANT_INFO:
@@ -763,24 +760,24 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         elif info_type == Info.BATCH_AND_SERIAL:
             info = "CMY02/116"
         elif info_type == Info.CAL_DATE:
-            info = "09Sep05"
+            info = "29Jul15"
         elif info_type == Info.KERNEL_DRIVER_VERSION:
             # weirdly, there is no example given in manual, so just return a
             # made-up value
-            info = "1"
+            info = "PICOPP.SYS V1.0"
         elif info_type == Info.ERROR:
             # nothing relevant to return other than OK
-            info = Error.OK
+            info = str(Error.OK)
         elif info_type == Info.SETTINGS_ERROR:
-            info = self._settings_error_code
+            info = str(self._settings_error_code)
 
         # clip info up to the specified length
-        info = info[:int(len_str_buf)]
+        info = info[:int(len_str_buf.value)]
 
         # write info into buffer
-        pnt_str_buf.value = info
+        self._c_str_buf.value = info.encode("utf-8")
 
-        return ctypes.c_int16(len(info))
+        return len(info)
 
     def _hrdl_set_analog_in_channel(self, handle, channel, enabled, vrange, itype):
         """Set fake analog input channel
@@ -792,12 +789,12 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         if not Channel.is_valid(int(channel.value)):
             # invalid channel
             self._settings_error_code = SettingsError.INVALID_CHANNEL
-            return ctypes.c_int16(0)
+            return 0
 
         if not VoltageRange.is_valid(int(vrange.value)):
             # invalid channel
             self._settings_error_code = SettingsError.INVALID_VOLTAGE_RANGE
-            return ctypes.c_int16(0)
+            return 0
 
         if int(enabled.value) == 1:
             self._fake_enabled_channels.add(int(channel.value))
@@ -808,4 +805,106 @@ class PicoLogAdc24Sim(PicoLogAdc24):
                 # don't care if channel already disabled
                 pass
 
-        return ctypes.c_int16(1)
+        # success
+        self._settings_error_code = SettingsError.OK
+        return 1
+
+    def _hrdl_set_interval(self, handle, sample_time, conversion_time):
+        conversion_time = int(conversion_time.value)
+
+        if not ConversionTime.is_valid(conversion_time):
+            # invalid conversion time
+            self._settings_error_code = SettingsError.INVALID_PARAMETER
+            return 0
+
+        # get conversion time in ms
+        conversion_time_ms = ConversionTime.get_conversion_time(conversion_time)
+
+        sample_time = int(sample_time.value)
+
+        # samples must be able to be made within the total sample time
+        if len(self.enabled_channels) * conversion_time_ms \
+            > sample_time:
+            # settings error
+            self._settings_error_code = SettingsError.CONVERSION_TIME_TOO_SLOW
+            return 0
+        # sample time must not be out of range
+        elif sample_time > self.MAX_SAMPLE_TIME:
+            self._settings_error_code = SettingsError.SAMPLE_INTERVAL_OUT_OF_RANGE
+            return 0
+
+        # success
+        self._settings_error_code = SettingsError.OK
+        return 1
+
+    def _hrdl_run(self, handle, sample_buf_len, sample_method):
+        sample_method = int(sample_method.value)
+
+        if not SampleMethod.is_valid(sample_method):
+            # invalid sample method
+            self._settings_error_code = SettingsError.INVALID_PARAMETER
+            return 0
+
+        # temporary: only support stream
+        if sample_method is not SampleMethod.STREAM:
+            raise Exception("Only streaming sample method currently supported")
+
+        sample_buf_len = int(sample_buf_len.value)
+
+        if sample_buf_len > self.MAX_BUF_LEN:
+            # sample buffer length out of range
+            self._settings_error_code = SettingsError.INVALID_PARAMETER
+            return 0
+
+        # success
+        self._settings_error_code = SettingsError.OK
+        return 1
+
+    def _hrdl_get_times_and_values(self, handle, pnt_sample_times,
+                                    pnt_sample_values, pnt_overflow,
+                                    samples_per_channel):
+        # copy the fake samples and times
+        times = list(self._fake_samples_time_buf)
+        values = list(self._fake_samples_value_buf)
+
+        samples_per_channel = int(samples_per_channel.value)
+
+        # number of channels
+        n_channels = len(self.enabled_channels)
+
+        # number of samples, either the requested amount or the length of the
+        # list
+        n_times = len(times)
+        if samples_per_channel > n_times:
+            samples_per_channel = n_times
+
+        v_count = 0
+        for i in range(samples_per_channel):
+            # set sample time directly in the array
+            self._c_sample_times[i] = ctypes.c_int32(times[i])
+            for j in range(n_channels):
+                idx = n_channels * i + j
+                # set sample value directly in the array
+                self._c_sample_values[idx] = values[i][j]
+                # increment value counter
+                v_count += 1
+
+        # reset buffers
+        # FIXME: this should actually shift the values left by samples_per_channel
+        # times
+        self._fake_samples_time_buf = self._fake_samples_time_buf[samples_per_channel:]
+        self._fake_samples_value_buf = self._fake_samples_value_buf[idx+1:]
+
+        return v_count
+
+    def _hrdl_get_number_of_enabled_channels(self, handle, ptr_enabled_channels):
+        # set variable directly
+        self._c_enabled_channels = ctypes.c_int16(len(self.enabled_channels))
+
+        return 1
+
+    def _hrdl_get_min_max_adc_counts(self, handle, ptr_min_count, ptr_max_count, channel):
+        self._c_minimum_count.value = self.MIN_COUNT
+        self._c_maximum_count.value = self.MAX_COUNT
+
+        return 1

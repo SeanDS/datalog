@@ -33,8 +33,8 @@ class Reading(object):
 
         # check channels and samples lists are same length
         if len(channels) is not len(samples):
-            raise Exception("Specified channels is not the same length as\
-specified samples")
+            raise Exception("Specified channels is not the same length as "
+                            "specified samples")
 
         # store channels
         self.channels = list(channels)
