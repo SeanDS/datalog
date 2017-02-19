@@ -29,11 +29,11 @@ class PicoLogAdcLib(AbstractHwLib):
 
         # string, times and values buffers
         self.str_buf = ctypes.create_string_buffer( \
-                        int(self.config['unit']['str_buf_len']))
+                        int(self.config['device']['str_buf_len']))
         self.sample_times = (ctypes.c_long \
-                            * int(self.config['unit']['sample_buf_len']))()
+                            * int(self.config['device']['sample_buf_len']))()
         self.sample_values = (ctypes.c_long \
-                            * int(self.config['unit']['sample_buf_len']))()
+                            * int(self.config['device']['sample_buf_len']))()
 
         # default channel voltages
         self.channel_voltages = {i: self.DEFAULT_CHANNEL_VOLTAGE \
@@ -46,8 +46,7 @@ class PicoLogAdcLib(AbstractHwLib):
 
     def _load_library(self):
         # load library
-        self.library = ctypes.CDLL( \
-                        self.config['picolog_lib_paths']['adc24'])
+        self.library = ctypes.CDLL(self.config['picolog']['lib_path_adc24'])
 
         logging.getLogger("adc").debug("C library for unit loaded")
 
@@ -90,8 +89,8 @@ class PicoLogAdcLib(AbstractHwLib):
 
     def configure(self):
         # set the sample rates
-        self.set_sample_time(int(self.config['unit']['sample_time']), \
-            int(self.config['unit']['conversion_time']))
+        self.set_sample_time(int(self.config['device']['sample_time']), \
+            int(self.config['device']['conversion_time']))
 
         # TODO: set up the channels properly
         self.set_analog_in_channel(
@@ -346,7 +345,7 @@ class PicoLogAdcLib(AbstractHwLib):
         status = int(
             self.library.HRDLRun(
                 self._c_handle,
-                ctypes.c_long(int(self.config['unit']['sample_buf_len'])),
+                ctypes.c_long(int(self.config['device']['sample_buf_len'])),
                 ctypes.c_short(sample_method)
             ))
 
@@ -399,7 +398,7 @@ class PicoLogAdcLib(AbstractHwLib):
         """Fetches uncollected sample payload from the unit"""
 
         # calculate number of values to collect for each channel
-        samples_per_channel = int(self.config['unit']['sample_buf_len']) \
+        samples_per_channel = int(self.config['device']['sample_buf_len']) \
                             // len(self.enabled_channels)
 
         # get samples, without using the overflow short parameter (None == NULL)
@@ -446,11 +445,11 @@ class PicoLogAdcLib(AbstractHwLib):
 
         # check last value of i - if it's near the buffer length, we need
         # to be very careful because wrapping might have occurred
-        if i >= int(self.config['unit']['sample_buf_len']) - 1:
+        if i >= int(self.config['device']['sample_buf_len']) - 1:
             # raise a warning
             logging.getLogger("adc").warning("The sample buffer length ({0}) "
                 "has been reached for sample(s) received beginning at time "
-                "{1}".format(int(self.config['unit']['sample_buf_len']), times[-1]))
+                "{1}".format(int(self.config['device']['sample_buf_len']), times[-1]))
 
         return times, values
 
@@ -595,8 +594,8 @@ class PicoLogAdcLibSim(PicoLogAdcLib):
 
     def configure(self):
         # set the sample rates
-        self.set_sample_time(int(self.config['unit']['sample_time']), \
-            int(self.config['unit']['conversion_time']))
+        self.set_sample_time(int(self.config['device']['sample_time']), \
+            int(self.config['device']['conversion_time']))
 
         # TODO: set up the channels properly
         self.set_analog_in_channel(
@@ -778,7 +777,7 @@ class PicoLogAdcLibSim(PicoLogAdcLib):
 
         logging.getLogger("adc").info("Starting fake unit streaming")
 
-        if int(self.config['unit']['sample_buf_len']) > self.MAX_BUF_LEN:
+        if int(self.config['device']['sample_buf_len']) > self.MAX_BUF_LEN:
             # sample buffer length out of range
             self._settings_error_code = SettingsError.INVALID_PARAMETER
             self.raise_unit_error()

@@ -84,22 +84,22 @@ class Server(threading.Thread):
         # clients list
         self._clients = []
 
-        # create selector to interface with OS
-        sel = selectors.DefaultSelector()
-
-        # register the connection handler for when a client connects
-        sel.register(self._socket, selectors.EVENT_READ, self.handle_connection)
-
+        # set server running flag (used by stop method)
         self.server_running = True
 
-        while self.server_running:
-            # select events, with a 1 second maximum wait
-            events = sel.select(timeout=1)
+        # create selector to interface with OS
+        with selectors.DefaultSelector() as sel:
+            # register the connection handler for when a client connects
+            sel.register(self._socket, selectors.EVENT_READ, self.handle_connection)
 
-            # loop over events, if any
-            for key, _ in events:
-                # run the callback
-                key.data()
+            while self.server_running:
+                # select events, with a 1 second maximum wait
+                events = sel.select(timeout=1)
+
+                # loop over events, if any
+                for key, _ in events:
+                    # run the callback
+                    key.data()
 
         # close clients
         self._close_clients()

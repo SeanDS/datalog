@@ -31,9 +31,9 @@ class Adc(object):
         # (doing this earlier can lead to circular imports)
         from datalog.adc.hrdl.picolog import PicoLogAdcLib, PicoLogAdcLibSim
 
-        if self.config['unit']['type'] == 'PicoLog24':
+        if self.config['device']['type'] == 'PicoLog24':
             self.library = PicoLogAdcLib(self.config)
-        elif self.config['unit']['type'] == 'PicoLog24Sim':
+        elif self.config['device']['type'] == 'PicoLog24Sim':
             self.library = PicoLogAdcLibSim(self.config)
         else:
             raise ValueError('Unrecognised unit type')

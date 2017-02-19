@@ -42,7 +42,7 @@ class Retriever(threading.Thread):
             raise Exception("Device is not open")
 
         # time between polls
-        poll_rate = int(self.config['retriever']['poll_rate'])
+        poll_rate = int(self.config['fetch']['poll_rate'])
         logger.info("Poll rate: {0:.2f} ms".format(poll_rate))
 
         # start streaming
@@ -100,10 +100,10 @@ class Retriever(threading.Thread):
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-            if time_since_start > 100000:
+            #if time_since_start > 100000:
                 # temporary hack: exit after 100 seconds
-                logger.debug("Exiting after 100s")
-                self.retrieving = False
+                #logger.debug("Exiting after 100s")
+                #self.retrieving = False
 
     def stop(self):
         """Stops the ADC data stream"""
