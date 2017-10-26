@@ -1,6 +1,5 @@
 import os
 import json
-from collections import deque
 
 """Data representation classes."""
 
@@ -168,18 +167,22 @@ class Sample(object):
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
 
-    def __init__(self, queue_len, conversion_callbacks=[]):
+    # default number of readings to return
+    DEFAULT_AMOUNT = 1000
+
+    def __init__(self, max_size, conversion_callbacks=[]):
         """Initialises the datastore
 
-        :param queue_len: the maximum number of readings to hold in the datastore
+        :param max_size: the maximum number of readings to hold in the datastore
         :param conversion_callbacks: list of methods to call on each reading's \
         data
         """
 
+        self.max_size = int(max_size)
         self.conversion_callbacks = list(conversion_callbacks)
 
         # initialise readings as a queue
-        self.readings = deque([], queue_len)
+        self.readings = []
 
     @classmethod
     def instance_from_json(cls, json_str, *args, **kwargs):
@@ -208,10 +211,10 @@ class DataStore(object):
         """
 
         # new object with the same max length
-        obj = self.__class__(self, self.maxlen)
+        obj = self.__class__(self.max_size)
 
         # add the existing readings
-        obj.extend(readings)
+        obj.insert(readings)
 
         # return
         return obj
@@ -220,17 +223,31 @@ class DataStore(object):
         """String representation of this datastore"""
         return self.csv_repr()
 
-    def csv_repr(self):
+    def csv_repr(self, **options):
         """CSV representation of this datastore"""
-        return "\n".join([reading.csv_repr() for reading in self.readings])
+        return "\n".join([reading.csv_repr() for reading in self._get_readings(**options)])
 
-    def list_repr(self):
+    def list_repr(self, **options):
         """List representation of this datastore"""
-        return [reading.csv_repr() for reading in self.readings]
+        return [reading.csv_repr() for reading in self._get_readings(**options)]
 
-    def json_repr(self):
+    def json_repr(self, **options):
         """JSON representation of this datastore"""
-        return json.dumps([reading.dict_repr() for reading in self.readings])
+        return json.dumps([reading.dict_repr() for reading in self._get_readings(**options)])
+
+    def _get_readings(self, amount=None, desc=True):
+        if amount is None:
+            amount = self.DEFAULT_AMOUNT
+
+        amount = int(amount)
+        desc = bool(desc)
+
+        if desc:
+            readings = self.readings[-amount:]
+        else:
+            readings = self.readings[:amount]
+
+        return readings
 
     def sample_dict_gen(self):
         """List of dicts containing individual samples, across all channels
@@ -251,7 +268,7 @@ class DataStore(object):
 
         # add each reading, but check it is a later timestamp than the last
         for reading in readings:
-            # check if reading is not valid - reading is zero and samples are zero
+            # check if reading is invalid: reading time is zero and samples are zero
             if reading.reading_time == 0 and not \
             any([sample for sample in reading.samples if sample.value != 0]):
                 continue
@@ -276,6 +293,11 @@ class DataStore(object):
 
         # add reading to storage
         self.readings.append(reading)
+
+        # check max length
+        if len(self.readings) >= self.max_size:
+            # delete oldest entries
+            self.readings = self.readings[-self.max_size:]
 
     def insert_from_json_list(self, data, *args, **kwargs):
         """Inserts readings from the specified dict
