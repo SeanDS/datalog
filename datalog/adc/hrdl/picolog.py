@@ -522,13 +522,13 @@ class PicoLogAdc24(Adc):
 
         return times, values
 
-    def _sample_lists(self, num_samples):
+    def _sample_lists(self, num_values):
         """Converts time and value C buffers into Python lists"""
 
-        num_samples = int(num_samples)
+        num_values = int(num_values)
 
-        # number of values is the number of samples * number of enabled channels
-        num_values = num_samples * len(self.enabled_channels)
+        # number of samples in the time period, i.e. total values divided by number of channels
+        num_samples = num_values // len(self.enabled_channels)
 
         # convert to list and return
         # NOTE: the conversion from c_long elements to ints is done by the slice operation
