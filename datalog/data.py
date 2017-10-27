@@ -1,6 +1,5 @@
 """Data representation classes."""
 
-import os
 import json
 
 # maximum requested readings
@@ -10,13 +9,13 @@ class Reading(object):
     """Class to represent a device reading for a particular time. This contains
     the samples for each active channel in the ADC for a particular time."""
 
-    """Reading time"""
+    # reading time
     reading_time = None
 
-    """Channels"""
+    # channels
     channels = None
 
-    """Samples"""
+    # samples
     samples = None
 
     def __init__(self, reading_time, channels, samples):
@@ -55,12 +54,12 @@ class Reading(object):
         """List representation of this reading"""
 
         # reading time
-        str = [self.reading_time]
+        message = [self.reading_time]
 
         # samples
-        str.extend([sample.value for sample in self.samples])
+        message.extend([sample.value for sample in self.samples])
 
-        return str
+        return message
 
     def csv_repr(self):
         """CSV representation of this reading"""
@@ -139,10 +138,10 @@ class Reading(object):
 class Sample(object):
     """Class to represent a single sample of a single channel."""
 
-    """Channel number"""
+    # channel number
     channel = None
 
-    """Value"""
+    # value
     value = None
 
     def __init__(self, channel, value):
@@ -172,13 +171,16 @@ class DataStore(object):
     # default number of readings to return
     DEFAULT_AMOUNT = 1000
 
-    def __init__(self, max_size, conversion_callbacks=[]):
+    def __init__(self, max_size, conversion_callbacks=None):
         """Initialises the datastore
 
         :param max_size: the maximum number of readings to hold in the datastore
         :param conversion_callbacks: list of methods to call on each reading's \
         data
         """
+
+        if conversion_callbacks is None:
+            conversion_callbacks = []
 
         self.max_size = int(max_size)
         self.conversion_callbacks = list(conversion_callbacks)
@@ -285,7 +287,6 @@ class DataStore(object):
         Returns a generator.
         """
 
-        # FIXME: can this instead use list comprehension?
         for reading in self.readings:
             yield reading.sample_dict_gen()
 
@@ -304,7 +305,7 @@ class DataStore(object):
                 continue
 
             # check the reading time is latest
-            if len(self.readings) > 0:
+            if self.readings:
                 if reading.reading_time <= self.readings[-1].reading_time:
                     raise Exception("A new reading time is earlier than or "
                                     "equal to an existing reading time")
@@ -340,55 +341,3 @@ class DataStore(object):
 
         # insert
         self.insert(readings, *args, **kwargs)
-
-    def find_reading(self, timestamp):
-        """Returns the reading matching the specified time
-
-        :param timestamp: the timestamp to find the reading for
-        """
-
-        # find reading, or return None if not found
-        return next((reading for reading in self.readings \
-        if reading.reading_time == timestamp), None)
-
-    def find_readings_after(self, timestamp, max_readings=None):
-        """Returns a new datastore containing readings after the specified time
-
-        :param timestamp: the timestamp to find readings after
-        :param max_readings: maximum number of readings to return
-        """
-
-        # sanitise max readings
-        if max_readings is not None:
-            max_readings = int(max_readings)
-
-        # create new datastore containing readings with timestamp >= specified timestamp
-        readings = self.filtered_instance([reading for reading \
-        in self.readings if reading.reading_time > timestamp])
-
-        # remove readings up to max
-        readings.readings = readings.readings[:max_readings]
-
-        # return datastore
-        return readings
-
-    def find_readings_before(self, timestamp, max_readings=None):
-        """Returns a new datastore containing readings before the specified time
-
-        :param timestamp: the timestamp to find readings before
-        :param max_readings: maximum number of readings to return
-        """
-
-        # sanitise max readings
-        if max_readings is not None:
-            max_readings = int(max_readings)
-
-        # create new datastore containing readings with timestamp < specified timestamp
-        readings = self.instance_with_readings([reading for reading in self.readings \
-        if reading.reading_time <= timestamp])
-
-        # remove readings up to max
-        readings.readings = readings.readings[:max_readings]
-
-        # return datastore
-        return readings

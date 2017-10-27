@@ -6,8 +6,27 @@ import logging
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
+class BaseConfig(ConfigParser):
+    """Base config parser"""
 
-class AdcConfig(ConfigParser):
+    def __init__(self, *args, **kwargs):
+        super(BaseConfig, self).__init__(*args, **kwargs)
+
+        # server config
+        self['server'] = {
+            'host': 'localhost',
+            'port': '8080',
+            'max_connections': '5',
+            'socket_buf_len': '1000',
+            'default_readings_per_request': '100',
+            'max_readings_per_request': '1000',
+            'default_format': 'json'
+        }
+
+
+class AdcConfig(BaseConfig):
+    """ADC config parser"""
+
     DEFAULT_CONFIG_PATH = os.path.join(THIS_DIR, 'adc.conf')
 
     def __init__(self, path=None, *args, **kwargs):
@@ -26,17 +45,6 @@ class AdcConfig(ConfigParser):
             'type': 'PicoLog24'
         }
 
-        # server config
-        self['server'] = {
-            'host': 'localhost',
-            'port': '8080',
-            'max_connections': '5',
-            'socket_buf_len': '1000',
-            'default_readings_per_request': '100',
-            'max_readings_per_request': '1000',
-            'default_format': 'json'
-        }
-
         # retriever settings
         self['fetch'] = {
             # time to wait between ADC polls (ms)
@@ -51,6 +59,6 @@ class AdcConfig(ConfigParser):
         if path is None:
             path = self.DEFAULT_CONFIG_PATH
 
-        with open(path) as f:
-            logging.getLogger("config").debug("Reading config from {0}".format(path))
-            self.read_file(f)
+        with open(path) as obj:
+            logging.getLogger("config").debug("Reading config from %s", path)
+            self.read_file(obj)

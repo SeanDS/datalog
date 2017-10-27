@@ -1,3 +1,5 @@
+"""PicoLog driver wrappers"""
+
 import time
 import logging
 import ctypes
@@ -10,11 +12,19 @@ from .constants import Handle, Channel, Status, Info, Error, SettingsError, \
 
 
 class PicoLogAdc24(Adc):
+    """PicoLog ADC24 driver wrapper"""
+
     NUM_CHANNELS = 16
     DEFAULT_CHANNEL_VOLTAGE = VoltageRange.RANGE_MAX
     DEFAULT_CHANNEL_TYPE = InputType.SINGLE
 
     def __init__(self, config, *args, **kwargs):
+        """Instantiate a PicoLogAdc24
+
+        :param config: configuration object
+        :type config: :class:`~datalog.adc.config`
+        """
+
         # call parent
         super(PicoLogAdc24, self).__init__(config=config, *args, **kwargs)
 
@@ -643,8 +653,9 @@ class PicoLogAdc24(Adc):
         return int(self.lib.HRDLGetMinMaxAdcCounts(handle, ptr_min_count,
                                                    ptr_max_count, channel))
 
+
 class PicoLogAdc24Sim(PicoLogAdc24):
-    """Represents a simulated :class:`PicoLogAdc24`."""
+    """Represents a simulated :class:`PicoLogAdc24` useful for testing"""
 
     # maximum string buffer (guess)
     MAX_BUF_LEN = 2 ** 32 / 2 - 1
@@ -892,7 +903,6 @@ class PicoLogAdc24Sim(PicoLogAdc24):
                 v_count += 1
 
         # reset buffers
-        # FIXME: this should actually shift the values left by samples_per_channel
         self._fake_samples_time_buf = self._fake_samples_time_buf[samples_per_channel:]
         self._fake_samples_value_buf = self._fake_samples_value_buf[idx+1:]
 

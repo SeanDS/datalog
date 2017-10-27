@@ -3,73 +3,113 @@
 import time
 import logging
 import json
-from bottle import route, request, run, get, abort
+from bottle import route, request, run, abort
 
 import datalog
 from datalog.adc.config import AdcConfig
 
 # fetch configuration
-config = AdcConfig()
+CONFIG = AdcConfig()
 
 # datastore object used for REST requests
-datastore = None
+DATASTORE = None
 
 # server start time
-start_time = None
+START_TIME = None
 
-def run_server(ds):
-    global datastore, start_time
+def run_server(datastore):
+    """Start server
+
+    :param datastore: datastore to serve
+    :type datastore: :class:`~datalog.data.DataStore`
+    """
+
+    global DATASTORE, START_TIME
 
     # save datastore
-    datastore = ds
+    DATASTORE = datastore
 
     # start it
     logging.getLogger("rest-server").info("Starting web server")
 
     # set start time
-    start_time = int(round(time.time() * 1000))
+    START_TIME = int(round(time.time() * 1000))
 
     # create server
-    run(host=config["server"]["host"], port=int(config["server"]["port"]))
+    run(host=CONFIG["server"]["host"], port=int(CONFIG["server"]["port"]))
 
     logging.getLogger("rest-server").info("Web server stopped")
 
 @route('/earliest')
 def earliest():
+    """Get earliest readings in datastore
+
+    :return: formatted data
+    :rtype: string
+    """
+
     return handle_fixed_list(desc=False, **data_query_args())
 
 @route('/latest')
 def latest():
+    """Get latest readings in datastore
+
+    :return: formatted data
+    :rtype: string
+    """
+
     return handle_fixed_list(desc=True, **data_query_args())
 
-@route('/before/<time:int>')
-def before(time):
+@route('/before/<pivot_time:int>')
+def before(pivot_time):
+    """Get readings before a certain time in datastore
+
+    :param pivot_time: time to get readings before
+    :type pivot_time: int
+    :return: formatted data
+    :rtype: string
+    """
+
     try:
-        return handle_fixed_list(pivot_time=time, pivot_after=False,
+        return handle_fixed_list(pivot_time=pivot_time, pivot_after=False,
                                  **data_query_args())
-    except TypeError as e:
+    except TypeError:
         abort(400, "Invalid parameter")
 
-@route('/after/<time:int>')
-def after(time):
+@route('/after/<pivot_time:int>')
+def after(pivot_time):
+    """Get readings after a certain time in datastore
+
+    :param pivot_time: time to get readings after
+    :type pivot_time: int
+    :return: formatted data
+    :rtype: string
+    """
+
     try:
-        return handle_fixed_list(pivot_time=time, pivot_after=True,
+        return handle_fixed_list(pivot_time=pivot_time, pivot_after=True,
                                  **data_query_args())
-    except TypeError as e:
+    except TypeError:
         abort(400, "Invalid parameter")
 
 @route('/info')
 def info():
-    global start_time
+    """Get server info
 
-    fmt = request.query.get("fmt", default=DEFAULT_FORMAT)
+    :return: formatted server info
+    :rtype: string
+    """
+
+    global START_TIME
+
+    fmt = request.query.get("fmt", default=CONFIG["server"]["default_format"])
 
     # uptime
-    up_time = int(round(time.time() * 1000)) - start_time
+    up_time = int(round(time.time() * 1000)) - START_TIME
 
     data = {
         "server_version": datalog.__version__,
-        "start_time": start_time,
+        "start_time": START_TIME,
         "up_time": up_time
     }
 
@@ -82,19 +122,33 @@ def info():
         abort(400, "Invalid format")
 
 def handle_fixed_list(fmt, *args, **kwargs):
-    global datastore
+    """Generate a string representation of the data given specified filters
+
+    :param fmt: data format
+    :type fmt: string
+    :return: formatted data
+    :rtype: string
+    """
+
+    global DATASTORE
 
     if fmt == "json":
-        return datastore.json_repr(*args, **kwargs)
+        return DATASTORE.json_repr(*args, **kwargs)
     elif fmt == "csv":
-        return datastore.csv_repr(*args, **kwargs)
+        return DATASTORE.csv_repr(*args, **kwargs)
     else:
         abort(400, "Invalid format")
 
 def data_query_args():
-    fmt = request.query.get("fmt", default=config["server"]["default_format"])
+    """Extract query arguments
+
+    :return: collection of query keys and values
+    :rtype: dict
+    """
+
+    fmt = request.query.get("fmt", default=CONFIG["server"]["default_format"])
     amount = request.query.get("amount",
-                               default=config["server"]["default_readings_per_request"])
+                               default=CONFIG["server"]["default_readings_per_request"])
 
     return {
         "fmt": fmt,

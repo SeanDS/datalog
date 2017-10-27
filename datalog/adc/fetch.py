@@ -4,6 +4,7 @@ import time
 import threading
 import logging
 
+
 class Retriever(threading.Thread):
     """Class to retrieve data from an ADC and insert it into a datastore"""
 
