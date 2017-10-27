@@ -1,9 +1,8 @@
+"""Data retrieval from ADC unit"""
+
 import time
 import threading
 import logging
-from configparser import ConfigParser
-
-"""Data retrieval from ADC unit"""
 
 class Retriever(threading.Thread):
     """Class to retrieve data from an ADC and insert it into a datastore"""
@@ -25,8 +24,17 @@ class Retriever(threading.Thread):
         self.adc = adc
         self.datastore = datastore
 
+        # default start time
+        self.start_time = None
+
+        # default next poll time
+        self._next_poll_time = None
+
+        # retrieval flag
+        self.retrieving = False
+
         # default context flag
-        self._context = False
+        self.context = False
 
     def run(self):
         """Starts streaming data from the ADC"""
@@ -34,7 +42,7 @@ class Retriever(threading.Thread):
         # get an instance of the logger
         logger = logging.getLogger("retriever")
 
-        if not self._context:
+        if not self.context:
             raise Exception("This can only be run within "
                             "adc.device.retriever context")
 
@@ -69,7 +77,7 @@ class Retriever(threading.Thread):
                 # skip this loop
                 continue
 
-            logger.debug("+{0} polling ADC".format(time_since_start))
+            logger.debug("+%i polling ADC", time_since_start)
 
             # check if ADC has values to retrieve
             if self.adc.ready():
@@ -84,7 +92,7 @@ class Retriever(threading.Thread):
                     # store data
                     self.datastore.insert(readings)
 
-                    logger.debug("Fetched {0} readings".format(n_readings))
+                    logger.debug("Fetched %i readings", n_readings)
 
             # set the next poll time
             self._next_poll_time += poll_rate

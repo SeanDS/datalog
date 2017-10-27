@@ -5,7 +5,6 @@ import abc
 from contextlib import contextmanager
 
 from datalog.device import Device
-from datalog.data import Reading
 from .fetch import Retriever
 
 
@@ -63,7 +62,7 @@ class Adc(Device, metaclass=abc.ABCMeta):
         retriever = Retriever(self, datastore, self.config)
 
         # set the context flag to allow it to run
-        retriever._context = True
+        retriever.context = True
 
         # start the retriever thread
         retriever.start()
@@ -85,79 +84,111 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def open(self):
-        raise NotImplemented()
+        """Open unit"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def stream(self):
-        raise NotImplemented()
+        """Stream from unit"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def close(self):
-        raise NotImplemented()
+        """Close unit"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def is_open(self):
-        raise NotImplemented()
+        """Check if unit is open"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def configure(self):
-        raise NotImplemented()
+        """Configure unit"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def ready(self):
-        raise NotImplemented()
+        """Check if unit is ready"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_unit_info(self, info_type):
-        raise NotImplemented()
+        """Get unit info
+
+        :param info_type: info to get
+        :type info_type: int
+        :return: unit information
+        :rtype: string
+        """
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_formatted_unit_info(self, info_type):
         """Fetches the specified information from the unit, with context
 
-        :return: formatted information string
+        :return: formatted unit information
+        :rtype: string
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_full_unit_info(self):
         """Fetches formatted string of all available unit info
 
-        :return: full unit information string
+        :return: full unit information
+        :rtype: string
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_last_error_code(self):
         """Fetches the last error code from the unit
 
         :return: error status code
+        :rtype: int
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_last_error_message(self):
         """Fetches the last error string from the unit
 
-        :return: error status string
+        :return: error status message
+        :rtype: string
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_last_settings_error_code(self):
         """Fetches the last settings error code from the unit
 
         :return: settings error status code
+        :rtype: int
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_last_settings_error_message(self):
         """Fetches the last settings error string from the unit
 
-        :return: settings error string
+        :return: settings error message
+        :rtype: string
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def raise_unit_error(self):
@@ -165,7 +196,8 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
         :raises Exception: upon discovering an error
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def raise_unit_settings_error(self):
@@ -173,27 +205,36 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
         :raises Exception: upon discovering a settings error
         """
-        raise NotImplemented()
+
+        return NotImplemented
 
     @abc.abstractmethod
     def set_analog_in_channel(self, channel, enabled, vrange, itype):
-        raise NotImplemented()
+        """Set analog input channel"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def set_sample_time(self, sample_time, conversion_time):
-        raise NotImplemented()
+        """Set sample time"""
 
-    @abc.abstractmethod
-    def stream(self):
-        raise NotImplemented()
+        return NotImplemented
 
     @abc.abstractmethod
     def get_readings(self):
-        raise NotImplemented()
+        """Get readings"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def get_enabled_channels_count(self):
-        raise NotImplemented()
+        """Get number of enabled channels
+
+        :return: number of enabled channels
+        :rtype: int
+        """
+
+        return NotImplemented
 
     def get_calibration(self, channel):
         """Returns the conversion factor from counts to volts for the
@@ -232,8 +273,12 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def _get_min_max_adc_counts(self, channel):
-        raise NotImplemented()
+        """Get minimum and maximum ADC counts"""
+
+        return NotImplemented
 
     @abc.abstractmethod
     def _get_channel_max_voltage(self, channel):
-        raise NotImplemented()
+        """Get maximum channel voltage"""
+
+        return NotImplemented

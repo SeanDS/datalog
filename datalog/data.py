@@ -1,7 +1,7 @@
+"""Data representation classes."""
+
 import os
 import json
-
-"""Data representation classes."""
 
 # maximum requested readings
 MAX_AMOUNT = 1000

@@ -1,3 +1,5 @@
+"""Configuration parser and defaults"""
+
 import os.path
 from configparser import ConfigParser
 import logging

@@ -1,3 +1,5 @@
+"""RESTful network data server"""
+
 import time
 import logging
 import json
