@@ -7,9 +7,9 @@ hardware. It may work with the `ADC20` without modification, but this is not
 tested.
 
 ## Prerequisites
+The following requirements must be met before `DataLog` is installed:
   * Python 3.5+
   * PicoLog ADC 20/24 hardware and driver (`libpicohrdl`)
-  * Bottle
 
 The PicoLog ADC driver can be obtained from
 [PicoLog](https://www.picotech.com/downloads/) and must be installed and working
@@ -20,12 +20,17 @@ Installation is handled by `setup.py`. This is most easily handled by `pip`:
 ```bash
 pip3 install git+https://github.com/SeanDS/datalog.git
 ```
+This installs the Python package dependencies automatically.
 
 ## Use
-The documentation should help to get you started. The main functionality is
-implemented in `datalog/adc/hrdl/picolog.py` and this class can be used on its
-own. A data server is also provided in `network.py` which is capable of providing
-network access to the data recorded by the unit.
+The documentation should help to get you started. Compile it with:
+```bash
+cd doc
+make html
+```
+The main functionality is implemented in `datalog/adc/hrdl/picolog.py` and this
+class can be used on its own. A data server is also provided in `network.py`
+which is capable of providing network access to the data recorded by the unit.
 
 ## Contributing
 I welcome contributions to the codebase - just open a pull request!
