@@ -684,6 +684,7 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # default settings error
         self._settings_error_code = SettingsError.OK
 
+        logging.getLogger("picolog").warning("Fake PicoLog ADC24 in use")
         logging.getLogger("picolog").debug("Fake library loaded")
 
     def _get_hrdl_lib(self):
