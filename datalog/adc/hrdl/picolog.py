@@ -184,7 +184,7 @@ class PicoLogAdc24(Adc):
     def get_unit_info(self, info_type):
         """Fetches the specified information from the unit
 
-        :param info_type: the :class:`~picolog.constants.Status` \
+        :param info_type: the :class:`~datalog.adc.hrdl.constants.Status` \
         constant to retrieve
         :return: specified information string
         """
@@ -375,7 +375,7 @@ class PicoLogAdc24(Adc):
             sample_time > conversion_time * active_channels
 
         where active_channels can be obtained from
-        `~picolog.hrdl.adc.get_enabled_channels_count`
+        `~datalog.adc.get_enabled_channels_count`
 
         :param sample_time: the time in milliseconds the unit has to sample \
         all active inputs

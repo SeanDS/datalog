@@ -1,12 +1,13 @@
 """Configuration parser and defaults"""
 
 import os.path
-from configparser import ConfigParser
 import logging
+import abc
+from configparser import ConfigParser
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-class BaseConfig(ConfigParser):
+class BaseConfig(ConfigParser, metaclass=abc.ABCMeta):
     """Base config parser"""
 
     def __init__(self, *args, **kwargs):
@@ -27,7 +28,7 @@ class BaseConfig(ConfigParser):
 class AdcConfig(BaseConfig):
     """ADC config parser"""
 
-    DEFAULT_CONFIG_PATH = os.path.join(THIS_DIR, 'adc.conf')
+    DEFAULT_CONFIG_FILENAME = 'adc.conf'
 
     def __init__(self, path=None, *args, **kwargs):
         super(AdcConfig, self).__init__(*args, **kwargs)
@@ -57,7 +58,7 @@ class AdcConfig(BaseConfig):
         }
 
         if path is None:
-            path = self.DEFAULT_CONFIG_PATH
+            path = os.path.join(THIS_DIR, self.DEFAULT_CONFIG_FILENAME)
 
         with open(path) as obj:
             logging.getLogger("config").debug("Reading config from %s", path)

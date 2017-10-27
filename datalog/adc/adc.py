@@ -84,43 +84,43 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def open(self):
-        """Open unit"""
+        """Opens unit"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def stream(self):
-        """Stream from unit"""
+        """Streams from unit"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def close(self):
-        """Close unit"""
+        """Closes unit"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def is_open(self):
-        """Check if unit is open"""
+        """Checks if unit is open"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def configure(self):
-        """Configure unit"""
+        """Configures unit"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def ready(self):
-        """Check if unit is ready"""
+        """Checks if unit is ready"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def get_unit_info(self, info_type):
-        """Get unit info
+        """Gets unit info
 
         :param info_type: info to get
         :type info_type: int
@@ -210,25 +210,25 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def set_analog_in_channel(self, channel, enabled, vrange, itype):
-        """Set analog input channel"""
+        """Sets analog input channel"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def set_sample_time(self, sample_time, conversion_time):
-        """Set sample time"""
+        """Sets sample time"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def get_readings(self):
-        """Get readings"""
+        """Gets readings"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def get_enabled_channels_count(self):
-        """Get number of enabled channels
+        """Gets number of enabled channels
 
         :return: number of enabled channels
         :rtype: int
@@ -242,10 +242,12 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
         The conversion factor is in volts per count, so you can get the
         voltage by multiplying this factor by the raw channel counts:
-
-            volts = conversion * counts
+        `voltage = conversion × counts`.
 
         :param channel: the channel to fetch the conversion factor for
+        :type channel: int
+        :return: conversion factor
+        :rtype: float
         """
 
         # get minimum and maximum counts for this channel
@@ -261,8 +263,11 @@ class Adc(Device, metaclass=abc.ABCMeta):
         """Converts the specified counts to volts
 
         :param counts: the counts to convert
+        :type counts: int
         :param channel: the channel number this measurements corresponds to
+        :type channel: int
         :return: voltage equivalent of counts
+        :rtype: float
         """
 
         # get conversion
@@ -273,12 +278,12 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def _get_min_max_adc_counts(self, channel):
-        """Get minimum and maximum ADC counts"""
+        """Gets minimum and maximum ADC counts"""
 
         return NotImplemented
 
     @abc.abstractmethod
     def _get_channel_max_voltage(self, channel):
-        """Get maximum channel voltage"""
+        """Gets maximum channel voltage"""
 
         return NotImplemented

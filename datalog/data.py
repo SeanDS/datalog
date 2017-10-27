@@ -81,12 +81,14 @@ class Reading(object):
 
     def json_repr(self):
         """JSON representation of this reading"""
+
         return json.dumps(self.dict_repr())
 
     def sample_dict_gen(self):
         """List of dicts containing individual samples
 
-        Returns a generator.
+        :return: sample generator
+        :rtype: Generator[Dict]
         """
 
         for sample in self.samples:
@@ -203,7 +205,7 @@ class DataStore(object):
         obj = cls(len(data), *args, **kwargs)
 
         # set readings
-        obj.insert_from_json_list(data)
+        obj.insert_from_dict_list(data)
 
         # return
         return obj
@@ -229,24 +231,28 @@ class DataStore(object):
 
     def csv_repr(self, **options):
         """CSV representation of this datastore"""
-        return "\n".join([reading.csv_repr() for reading in self._get_readings(**options)])
+        return "\n".join([reading.csv_repr() for reading in self.get_readings(**options)])
 
     def list_repr(self, **options):
         """List representation of this datastore"""
-        return [reading.csv_repr() for reading in self._get_readings(**options)]
+        return [reading.csv_repr() for reading in self.get_readings(**options)]
 
     def json_repr(self, **options):
         """JSON representation of this datastore"""
-        return json.dumps([reading.dict_repr() for reading in self._get_readings(**options)])
+        return json.dumps([reading.dict_repr() for reading in self.get_readings(**options)])
 
-    def _get_readings(self, amount=None, desc=False, pivot_time=0,
+    def get_readings(self, amount=None, desc=False, pivot_time=0,
                       pivot_after=True):
         """Get readings from datastore given certain filters
 
         :param amount: maximum number of readings to return
+        :type amount: int
         :param desc: descending order (false for ascending)
+        :type desc: boolean
         :param pivot_time: time to return data from before or after
+        :type pivot_time: int
         :param pivot_after: return times after pivot (false for before)
+        :type pivot_after: boolean
         """
 
         if amount is None:
@@ -282,9 +288,10 @@ class DataStore(object):
         return readings
 
     def sample_dict_gen(self):
-        """List of dicts containing individual samples, across all channels
+        """Get dicts containing individual samples, across all channels
 
-        Returns a generator.
+        :return: sample generator
+        :rtype: Generator[Dict]
         """
 
         for reading in self.readings:
@@ -294,7 +301,8 @@ class DataStore(object):
         """Inserts the specified readings into the datastore
 
         :param readings: list of readings to insert
-        :raises Exception: if a reading time is earlier than an existing reading
+        :type readings: List[:class:`~datalog.data.Reading`]
+        :raises ValueError: if a reading time is earlier than an existing reading
         """
 
         # add each reading, but check it is a later timestamp than the last
@@ -307,8 +315,8 @@ class DataStore(object):
             # check the reading time is latest
             if self.readings:
                 if reading.reading_time <= self.readings[-1].reading_time:
-                    raise Exception("A new reading time is earlier than or "
-                                    "equal to an existing reading time")
+                    raise ValueError("A new reading time is earlier than or "
+                                     "equal to an existing reading time")
 
             # everything's ok, so add it to the list
             self._insert_reading(reading)
@@ -317,6 +325,7 @@ class DataStore(object):
         """Inserts the specified reading, converting it if necessary
 
         :param reading: reading to insert
+        :type reading: :class:`~datalog.data.Reading`
         """
 
         # call conversion functions
@@ -330,10 +339,11 @@ class DataStore(object):
             # delete oldest entries
             self.readings = self.readings[-self.max_size:]
 
-    def insert_from_json_list(self, data, *args, **kwargs):
-        """Inserts readings from the specified dict
+    def insert_from_dict_list(self, data, *args, **kwargs):
+        """Inserts readings from the specified list of dict objects
 
         :param data: list containing reading dicts
+        :type data: List[Dict]
         """
 
         # create readings
