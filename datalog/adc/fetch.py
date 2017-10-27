@@ -86,8 +86,6 @@ class Retriever(threading.Thread):
 
                     logger.debug("Fetched {0} readings".format(n_readings))
 
-                    print(readings)
-
             # set the next poll time
             self._next_poll_time += poll_rate
 

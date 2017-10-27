@@ -27,14 +27,16 @@ class AdcConfig(ConfigParser):
         # server config
         self['server'] = {
             'host': 'localhost',
-            'port': '50000',
+            'port': '8080',
             'max_connections': '5',
             'socket_buf_len': '1000',
-            'max_readings_per_request': '1000'
+            'default_readings_per_request': '100',
+            'max_readings_per_request': '1000',
+            'default_format': 'json'
         }
 
         # retriever settings
-        self['retriever'] = {
+        self['fetch'] = {
             # time to wait between ADC polls (ms)
             'poll_rate': '10000'
         }

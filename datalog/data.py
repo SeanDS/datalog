@@ -3,6 +3,8 @@ import json
 
 """Data representation classes."""
 
+# maximum requested readings
+MAX_AMOUNT = 1000
 
 class Reading(object):
     """Class to represent a device reading for a particular time. This contains
@@ -235,17 +237,45 @@ class DataStore(object):
         """JSON representation of this datastore"""
         return json.dumps([reading.dict_repr() for reading in self._get_readings(**options)])
 
-    def _get_readings(self, amount=None, desc=True):
+    def _get_readings(self, amount=None, desc=False, pivot_time=0,
+                      pivot_after=True):
+        """Get readings from datastore given certain filters
+
+        :param amount: maximum number of readings to return
+        :param desc: descending order (false for ascending)
+        :param pivot_time: time to return data from before or after
+        :param pivot_after: return times after pivot (false for before)
+        """
+
         if amount is None:
             amount = self.DEFAULT_AMOUNT
 
         amount = int(amount)
         desc = bool(desc)
+        pivot_time = int(pivot_time)
 
+        # amount cannot exceed MAX_AMOUNT
+        if amount > MAX_AMOUNT:
+            amount = MAX_AMOUNT
+
+        # pivot must be a real timestamp
+        if pivot_time < 0:
+            pivot_time = 0
+
+        # create pivot function
+        if pivot_after:
+            fnc_pivot = lambda r: r.reading_time > pivot_time
+        else:
+            fnc_pivot = lambda r: r.reading_time <= pivot_time
+
+        # get ordered result set
         if desc:
             readings = self.readings[-amount:]
         else:
             readings = self.readings[:amount]
+
+        # get results from pivot
+        readings = [reading for reading in readings if fnc_pivot(reading)]
 
         return readings
 
