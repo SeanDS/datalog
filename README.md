@@ -12,8 +12,8 @@ The following requirements must be met before `DataLog` is installed:
   * PicoLog ADC 20/24 hardware and driver (`libpicohrdl`)
 
 The PicoLog ADC driver can be obtained from
-[PicoLog](https://www.picotech.com/downloads/) and must be installed and working
-before using this library.
+[PicoTech](https://www.picotech.com/downloads/) and must be installed and
+working before using this library.
 
 ## Installation
 Installation is handled by `setup.py`. This is most easily handled by `pip`:
