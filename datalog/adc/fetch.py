@@ -45,14 +45,14 @@ class Retriever(threading.Thread):
 
         if not self.context:
             raise Exception("This can only be run within "
-                            "adc.device.retriever context")
+                            "adc.adc.retriever context")
 
         if not self.adc.is_open():
             raise Exception("Device is not open")
 
         # time between polls
-        poll_rate = int(self.config['fetch']['poll_rate'])
-        logger.info("Poll rate: {0:.2f} ms".format(poll_rate))
+        poll_time = int(self.config['fetch']['poll_time'])
+        logger.info("Poll rate: {0:.2f} ms".format(poll_time))
 
         # start streaming
         self.adc.stream()
@@ -96,7 +96,7 @@ class Retriever(threading.Thread):
                     logger.debug("Fetched %i readings", n_readings)
 
             # set the next poll time
-            self._next_poll_time += poll_rate
+            self._next_poll_time += poll_time
 
             # sleep for the difference between now and then, minus some processing time
             sleep_time = 0.001 * (self._next_poll_time \
