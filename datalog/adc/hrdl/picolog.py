@@ -10,6 +10,8 @@ from datalog.data import Reading
 from .constants import Handle, Channel, Status, Info, Error, SettingsError, \
                        VoltageRange, InputType, ConversionTime, SampleMethod
 
+# logger
+logger = logging.getLogger("picolog")
 
 class PicoLogAdc24(Adc):
     """PicoLog ADC24 driver wrapper"""
@@ -90,7 +92,7 @@ class PicoLogAdc24(Adc):
         # load library
         self.lib = self._get_hrdl_lib()
 
-        logging.getLogger("picolog").debug("C library for unit loaded")
+        logger.debug("C library for unit loaded")
 
     def _get_hrdl_lib(self):
         return ctypes.CDLL(self.config['picolog']['lib_path_adc24'])
@@ -112,8 +114,7 @@ class PicoLogAdc24(Adc):
             else:
                 raise Exception('Unknown invalid handle status')
 
-        logging.getLogger("picolog").info("Unit opened with handle %i",
-                                          self.handle)
+        logger.info("Unit opened with handle %i", self.handle)
 
     def close(self):
         """Closes the currently open PicoLog unit"""
@@ -131,7 +132,7 @@ class PicoLogAdc24(Adc):
         # reset handle
         self.handle = None
 
-        logging.getLogger("picolog").info("Unit closed")
+        logger.info("Unit closed")
 
     def configure(self):
         # set the sample rates
@@ -189,7 +190,7 @@ class PicoLogAdc24(Adc):
         :return: specified information string
         """
 
-        logging.getLogger("picolog").debug("Getting unit info")
+        logger.debug("Getting unit info")
 
         # set info type
         self._c_info_type.value = int(info_type)
@@ -274,7 +275,7 @@ class PicoLogAdc24(Adc):
         :raises Exception: upon discovering an error
         """
 
-        logging.getLogger("picolog").debug("Checking for error")
+        logger.debug("Checking for error")
 
         # check for errors
         error = self.get_last_error_code()
@@ -288,7 +289,7 @@ class PicoLogAdc24(Adc):
         :raises Exception: upon discovering a settings error
         """
 
-        logging.getLogger("picolog").debug("Checking for settings error")
+        logger.debug("Checking for settings error")
 
         # check for settings errors
         settings_error = self.get_last_settings_error_code()
@@ -308,7 +309,7 @@ class PicoLogAdc24(Adc):
         invalid, or input type is invalid
         """
 
-        logging.getLogger("picolog").debug("Setting analog input channel")
+        logger.debug("Setting analog input channel")
 
         # check validity of channel
         if not Channel.is_valid(channel):
@@ -325,11 +326,9 @@ class PicoLogAdc24(Adc):
         # print warning to user if differential input is specified on an even
         # channel
         if itype is InputType.DIFFERENTIAL and channel % 2 == 0:
-            logging.getLogger("picolog").warning("Setting a differential input "
-                                                 "on a secondary channel is not"
-                                                 " possible. Instead set the "
-                                                 "input on the primary channel "
-                                                 "number.")
+            logger.warning("Setting a differential input on a secondary channel"
+                           " is not possible. Instead set the input on the "
+                           "primary channel number.")
 
         channel = int(channel)
         enabled = int(enabled)
@@ -361,10 +360,8 @@ class PicoLogAdc24(Adc):
         self.channel_voltages[channel] = vrange
         self.channel_types[channel] = itype
 
-        logging.getLogger("picolog").debug("Analog input channel %i set to "
-                                           "enabled=%i, vrange=%i, "
-                                           "type=%i", channel, enabled,
-                                           vrange, itype)
+        logger.debug("Analog input channel %i set to enabled=%i, vrange=%i, "
+                     "type=%i", channel, enabled, vrange, itype)
 
     def set_sample_time(self, sample_time, conversion_time):
         """Sets the time the unit can take to sample all active inputs.
@@ -407,9 +404,8 @@ class PicoLogAdc24(Adc):
         # save sample time
         self.sample_time = sample_time
 
-        logging.getLogger("picolog").debug("Sample time set to %i, conversion "
-                                           "time set to %i", sample_time,
-                                           conversion_time)
+        logger.debug("Sample time set to %i, conversion time set to %i",
+                     sample_time, conversion_time)
 
     def _run(self, sample_method):
         """Runs the unit recording functionality
@@ -438,7 +434,7 @@ class PicoLogAdc24(Adc):
     def stream(self):
         """Streams data from the unit"""
 
-        logging.getLogger("picolog").info("Starting unit streaming")
+        logger.info("Starting unit streaming")
 
         # run stream
         self._run(SampleMethod.STREAM)
@@ -549,7 +545,7 @@ class PicoLogAdc24(Adc):
         :return: number of enabled channels
         """
 
-        logging.getLogger("picolog").debug("Fetching enabled channel count")
+        logger.debug("Fetching enabled channel count")
 
         # get enabled channel count
         status = self._hrdl_get_number_of_enabled_channels(
@@ -588,8 +584,7 @@ class PicoLogAdc24(Adc):
         :return: minimum and maximum ADC counts for the specified channel
         """
 
-        logging.getLogger("picolog").debug("Fetching min/max ADC counts for "
-                                           "channel %i", channel)
+        logger.debug("Fetching min/max ADC counts for channel %i", channel)
 
         # set channel
         self._c_channel.value = int(channel)
@@ -684,8 +679,8 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # default settings error
         self._settings_error_code = SettingsError.OK
 
-        logging.getLogger("picolog").warning("Fake PicoLog ADC24 in use")
-        logging.getLogger("picolog").debug("Fake library loaded")
+        logger.warning("Fake PicoLog ADC24 in use")
+        logger.debug("Fake library loaded")
 
     def _get_hrdl_lib(self):
         # no library to load

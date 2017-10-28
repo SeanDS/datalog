@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from datalog.device import Device
 from .fetch import Retriever
 
+# logger
+logger = logging.getLogger("adc")
 
 class Adc(Device, metaclass=abc.ABCMeta):
     """Represents ADC hardware"""
@@ -32,7 +34,7 @@ class Adc(Device, metaclass=abc.ABCMeta):
         :param config: dict-like config object
         """
 
-        logging.getLogger("adc").info("Loading ADC driver")
+        logger.info("Loading ADC driver")
 
         # import libraries now that they are needed
         # (doing this earlier can lead to circular imports)
@@ -75,9 +77,9 @@ class Adc(Device, metaclass=abc.ABCMeta):
         finally:
             # stop the thread and wait until it finishes
             retriever.stop()
-            logging.getLogger("adc").debug("Waiting for retriever to stop")
+            logger.debug("Waiting for retriever to stop")
             retriever.join()
-            logging.getLogger("adc").info("Retriever stopped")
+            logger.info("Retriever stopped")
 
             # close the device
             self.close()

@@ -9,6 +9,10 @@ import appdirs
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
+# logger
+logger = logging.getLogger("config")
+
+
 class BaseConfig(ConfigParser, metaclass=abc.ABCMeta):
     """Base config parser"""
 
@@ -65,7 +69,7 @@ class AdcConfig(BaseConfig):
         path = self.get_config_filepath()
 
         with open(path) as obj:
-            logging.getLogger("config").debug("Reading config from %s", path)
+            logger.debug("Reading config from %s", path)
             self.read_file(obj)
 
     @classmethod
@@ -95,7 +99,7 @@ class AdcConfig(BaseConfig):
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        logging.getLogger("config").debug("Creating config file at %s", directory)
+        logger.debug("Creating config file at %s", directory)
 
         # copy across distribution template
         with open(config_file, 'wb') as user_file:

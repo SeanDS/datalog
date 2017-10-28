@@ -4,6 +4,9 @@ import time
 import threading
 import logging
 
+# logger
+logger = logging.getLogger("fetch")
+
 
 class Retriever(threading.Thread):
     """Class to retrieve data from an ADC and insert it into a datastore"""
@@ -39,9 +42,6 @@ class Retriever(threading.Thread):
 
     def run(self):
         """Starts streaming data from the ADC"""
-
-        # get an instance of the logger
-        logger = logging.getLogger("retriever")
 
         if not self.context:
             raise Exception("This can only be run within "
