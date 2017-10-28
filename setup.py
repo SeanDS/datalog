@@ -22,13 +22,17 @@ setup(
     author_email="datalog@attackllama.com",
     url="https://github.com/SeanDS/datalog",
     packages=[
-        "datalog"
+        "datalog",
+        "datalog.adc",
+        "datalog.adc.hrdl"
     ],
     package_dir={
-        "datalog": "datalog"
+        "datalog": "datalog",
+        "datalog.adc": "datalog/adc",
+        "datalog.adc.hrdl": "datalog/adc/hrdl"
     },
     package_data={
-        "datalog": ['adc/adc.conf.dist']
+        "datalog.adc": ['adc.conf.dist']
     },
     install_requires=requirements,
     license="GPLv3",
