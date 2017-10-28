@@ -5,6 +5,7 @@ import json
 # maximum requested readings
 MAX_AMOUNT = 1000
 
+
 class Reading(object):
     """Class to represent a device reading for a particular time. This contains
     the samples for each active channel in the ADC for a particular time."""

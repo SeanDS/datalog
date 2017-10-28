@@ -11,7 +11,8 @@ from .constants import Handle, Channel, Status, Info, Error, SettingsError, \
                        VoltageRange, InputType, ConversionTime, SampleMethod
 
 # logger
-logger = logging.getLogger("picolog")
+logger = logging.getLogger("datalog.picolog")
+
 
 class PicoLogAdc24(Adc):
     """PicoLog ADC24 driver wrapper"""

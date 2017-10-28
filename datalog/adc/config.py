@@ -10,7 +10,7 @@ import appdirs
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # logger
-logger = logging.getLogger("config")
+logger = logging.getLogger("datalog.config")
 
 
 class BaseConfig(ConfigParser, metaclass=abc.ABCMeta):

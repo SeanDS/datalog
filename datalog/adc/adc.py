@@ -8,7 +8,8 @@ from datalog.device import Device
 from .fetch import Retriever
 
 # logger
-logger = logging.getLogger("adc")
+logger = logging.getLogger("datalog.adc")
+
 
 class Adc(Device, metaclass=abc.ABCMeta):
     """Represents ADC hardware"""

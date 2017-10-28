@@ -5,7 +5,7 @@ import threading
 import logging
 
 # logger
-logger = logging.getLogger("fetch")
+logger = logging.getLogger("datalog.fetch")
 
 
 class Retriever(threading.Thread):
