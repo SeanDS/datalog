@@ -9,7 +9,6 @@ with open("README.md") as readme_file:
 __version__ = datalog.__version__
 
 requirements = [
-    "bottle",
     "appdirs"
 ]
 
