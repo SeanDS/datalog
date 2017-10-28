@@ -52,7 +52,7 @@ class Retriever(threading.Thread):
 
         # time between polls
         poll_time = int(self.config['fetch']['poll_time'])
-        logger.info("Poll rate: {0:.2f} ms".format(poll_time))
+        logger.info("Poll time: {0:.2f} ms".format(poll_time))
 
         # start streaming
         self.adc.stream()
@@ -97,20 +97,6 @@ class Retriever(threading.Thread):
 
             # set the next poll time
             self._next_poll_time += poll_time
-
-            # sleep for the difference between now and then, minus some processing time
-            sleep_time = 0.001 * (self._next_poll_time \
-                        - int(round(time.time() * 1000)) \
-                        - 20) # some ms for the processing of this expression
-
-            # don't sleep unless we have to
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-
-            #if time_since_start > 100000:
-                # temporary hack: exit after 100 seconds
-                #logger.debug("Exiting after 100s")
-                #self.retrieving = False
 
     def stop(self):
         """Stops the ADC data stream"""
