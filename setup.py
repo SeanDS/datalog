@@ -26,11 +26,6 @@ setup(
         "datalog.adc",
         "datalog.adc.hrdl"
     ],
-    package_dir={
-        "datalog": "datalog",
-        "datalog.adc": "datalog/adc",
-        "datalog.adc.hrdl": "datalog/adc/hrdl"
-    },
     package_data={
         "datalog.adc": ['adc.conf.dist']
     },
