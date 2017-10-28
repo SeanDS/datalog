@@ -29,8 +29,13 @@ cd doc
 make html
 ```
 The main functionality is implemented in `datalog/adc/hrdl/picolog.py` and this
-class can be used on its own. A data server is also provided in `network.py`
-which is capable of providing network access to the data recorded by the unit.
+class can be used on its own.
+
+### Site-specific use
+We use this library at the [University of Glasgow observatory](http://www.astro.gla.ac.uk/observatory/weather/Observatory_weather/Observatory_weather.htm)
+for our magnetometer. We have to calibrate the raw counts coming from the
+PicoLog unit, as well as upload this data to our FTP server. The set of scripts
+we use can be found [here](https://github.com/acrerd/magnetometer).
 
 ## Contributing
 I welcome contributions to the codebase - just open a pull request!

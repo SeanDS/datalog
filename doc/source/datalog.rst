@@ -2,7 +2,7 @@ DataLog Package
 ===============
 
 This package contains modules to access, configure and retrieve data from
-PicoLog ADC hardware and to provide web access to this data.
+PicoLog ADC hardware.
 
 The :mod:`~datalog.data` module provides a :class:`~datalog.data.DataStore`
 object to store and query :class:`~datalog.data.Reading` objects.
@@ -36,14 +36,6 @@ datalog.device module
 ---------------------
 
 .. automodule:: datalog.device
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-datalog.network module
-----------------------
-
-.. automodule:: datalog.network
     :members:
     :undoc-members:
     :show-inheritance:
