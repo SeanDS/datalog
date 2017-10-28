@@ -170,16 +170,22 @@ class Sample(object):
 class DataStore(object):
     """Class to store and retrieve ADC readings."""
 
+    # default datastore size
+    DEFAULT_SIZE = 1000
+
     # default number of readings to return
     DEFAULT_AMOUNT = 1000
 
-    def __init__(self, max_size, conversion_callbacks=None):
+    def __init__(self, max_size=None, conversion_callbacks=None):
         """Initialises the datastore
 
         :param max_size: the maximum number of readings to hold in the datastore
         :param conversion_callbacks: list of methods to call on each reading's \
         data
         """
+
+        if max_size is None:
+            max_size = self.DEFAULT_SIZE
 
         if conversion_callbacks is None:
             conversion_callbacks = []
@@ -286,6 +292,10 @@ class DataStore(object):
         readings = [reading for reading in readings if fnc_pivot(reading)]
 
         return readings
+
+    @property
+    def num_readings(self):
+        return len(self.readings)
 
     def sample_dict_gen(self):
         """Get dicts containing individual samples, across all channels
