@@ -491,7 +491,7 @@ class PicoLogAdc24(Adc):
             ctypes.c_long(samples_per_channel))
 
         # check return status
-        if num_values is 0:
+        if num_samples is 0:
             raise Exception("Call failed or no values available")
 
         # convert times and values into Python lists
