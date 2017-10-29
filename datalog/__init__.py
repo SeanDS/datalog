@@ -3,7 +3,7 @@
 import logging
 
 __author__ = "Sean Leavey <datalog@attackllama.com>"
-__version__ = "0.7"
+__version__ = "0.7.1"
 
 # suppress warnings when the user code does not include a handler
 logging.getLogger().addHandler(logging.NullHandler())
