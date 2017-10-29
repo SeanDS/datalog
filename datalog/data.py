@@ -248,7 +248,7 @@ class DataStore(object):
         """JSON representation of this datastore"""
         return json.dumps([reading.dict_repr() for reading in self.get_readings(**options)])
 
-    def get_readings(self, amount=None, desc=False, pivot_time=0,
+    def get_readings(self, amount=None, desc=False, pivot_time=None,
                       pivot_after=True):
         """Get readings from datastore given certain filters
 
@@ -265,6 +265,9 @@ class DataStore(object):
         if amount is None:
             amount = self.DEFAULT_AMOUNT
 
+        if pivot_time is None:
+            pivot_time = 0
+
         amount = int(amount)
         desc = bool(desc)
         pivot_time = int(pivot_time)
@@ -272,6 +275,8 @@ class DataStore(object):
         # amount cannot exceed MAX_AMOUNT
         if amount > MAX_AMOUNT:
             amount = MAX_AMOUNT
+        elif amount < 0:
+            amount = 0
 
         # pivot must be a real timestamp
         if pivot_time < 0:
@@ -283,14 +288,14 @@ class DataStore(object):
         else:
             fnc_pivot = lambda r: r.reading_time <= pivot_time
 
+        # get results from pivot
+        readings = [reading for reading in self.readings if fnc_pivot(reading)]
+
         # get ordered result set
         if desc:
-            readings = self.readings[-amount:]
+            readings = readings[-amount:]
         else:
-            readings = self.readings[:amount]
-
-        # get results from pivot
-        readings = [reading for reading in readings if fnc_pivot(reading)]
+            readings = readings[:amount]
 
         return readings
 
@@ -345,10 +350,9 @@ class DataStore(object):
         # add reading to storage
         self.readings.append(reading)
 
-        # check max length
-        if len(self.readings) >= self.max_size:
-            # delete oldest entries
-            self.readings = self.readings[-self.max_size:]
+        # truncate oversized lists
+        while self.num_readings > self.max_size:
+            self.readings.pop(0)
 
     def insert_from_dict_list(self, data, *args, **kwargs):
         """Inserts readings from the specified list of dict objects
