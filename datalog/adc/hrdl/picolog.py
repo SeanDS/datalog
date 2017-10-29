@@ -483,7 +483,7 @@ class PicoLogAdc24(Adc):
                             // len(self.enabled_channels)
 
         # get samples, without using the overflow short parameter (None == NULL)
-        num_values = self._hrdl_get_times_and_values(
+        num_samples = self._hrdl_get_times_and_values(
             self.handle,
             ctypes.pointer(self._c_sample_times),
             ctypes.pointer(self._c_sample_values),
@@ -495,7 +495,7 @@ class PicoLogAdc24(Adc):
             raise Exception("Call failed or no values available")
 
         # convert times and values into Python lists
-        raw_times, raw_values = self._sample_lists(num_values)
+        raw_times, raw_values = self._sample_lists(num_samples)
 
         # empty lists for cleaned up times and samples
         times = []
@@ -525,13 +525,14 @@ class PicoLogAdc24(Adc):
 
         return times, values
 
-    def _sample_lists(self, num_values):
+    def _sample_lists(self, num_samples):
         """Converts time and value C buffers into Python lists"""
 
-        num_values = int(num_values)
+        num_samples = int(num_samples)
 
-        # number of samples in the time period, i.e. total values divided by number of channels
-        num_samples = num_values // len(self.enabled_channels)
+        # number of values in the time period, i.e. total samples times
+        # number of channels
+        num_values = num_samples * len(self.enabled_channels)
 
         # convert to list and return
         # NOTE: the conversion from c_long elements to ints is done by the slice operation
@@ -888,7 +889,7 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         if samples_per_channel > n_times:
             samples_per_channel = n_times
 
-        v_count = 0
+        sample_count = 0
         for i in range(samples_per_channel):
             # set sample time directly in the array
             self._c_sample_times[i] = ctypes.c_int32(times[i])
@@ -896,14 +897,15 @@ class PicoLogAdc24Sim(PicoLogAdc24):
                 idx = n_channels * i + j
                 # set sample value directly in the array
                 self._c_sample_values[idx] = values[i][j]
-                # increment value counter
-                v_count += 1
+
+            # increment sample counter
+            sample_count += 1
 
         # reset buffers
         self._fake_samples_time_buf = self._fake_samples_time_buf[samples_per_channel:]
         self._fake_samples_value_buf = self._fake_samples_value_buf[idx+1:]
 
-        return v_count
+        return sample_count
 
     def _hrdl_get_number_of_enabled_channels(self, handle, ptr_enabled_channels):
         # set variable directly
