@@ -345,7 +345,8 @@ class DataStore(object):
         """
 
         # call conversion functions
-        map(reading.apply_function, self.conversion_callbacks)
+        for fcn in self.conversion_callbacks:
+            reading.apply_function(fcn)
 
         # add reading to storage
         self.readings.append(reading)
