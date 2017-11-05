@@ -1,6 +1,7 @@
 """Data representation classes."""
 
 import json
+import datetime
 
 # maximum requested readings
 MAX_AMOUNT = 1000
@@ -22,7 +23,7 @@ class Reading(object):
     def __init__(self, reading_time, channels, samples):
         """Initialises a reading
 
-        :param reading_time: the time of this reading
+        :param reading_time: the timestamp for this reading, in milliseconds
         :param channels: enabled channels, in order
         :param samples: channel samples, in order
         :raises Exception: if channel list and samples list are not the same \
@@ -46,6 +47,16 @@ class Reading(object):
         # store samples
         for this_channel, this_sample in zip(channels, samples):
             self.samples.append(Sample(this_channel, this_sample))
+
+    @property
+    def reading_date(self):
+        """Python datetime object representing this reading's time
+
+        :return: date of this reading's time
+        :rtype: :class:`~datetime.datetime`
+        """
+
+        return datetime.datetime.utcfromtimestamp(self.reading_time / 1000)
 
     def __repr__(self):
         """String representation of this reading"""
@@ -298,6 +309,29 @@ class DataStore(object):
             readings = readings[:amount]
 
         return readings
+
+    def get_datetime_grouped_readings(self, *args, **kwargs):
+        """Get readings grouped by date
+
+        :param group_date_format: date format to use when grouping readings
+        :type group_date_format: str
+        """
+
+        # reading list
+        readings = self.get_readings(*args, **kwargs)
+
+        groups = {}
+
+        for reading in readings:
+            reading_date = reading.reading_date
+
+            if reading_date not in groups:
+                # create group
+                groups[reading_date] = []
+
+            groups[reading_date].append(reading)
+
+        return groups
 
     @property
     def num_readings(self):
