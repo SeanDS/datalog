@@ -3,7 +3,7 @@ sample_time = 3000
 conversion_time = 4
 
 [adc]
-type = PicoLog24
+type = PicoLog24Sim
 
 [picolog]
 # channel config
