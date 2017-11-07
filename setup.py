@@ -13,7 +13,7 @@ requirements = [
 ]
 
 setup(
-    name="DataLog",
+    name="datalog",
     version=__version__,
     description="Python library to interface with PicoLog ADC hardware",
     long_description=readme,
