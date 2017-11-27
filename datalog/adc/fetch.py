@@ -31,14 +31,22 @@ class Retriever(threading.Thread):
         # default start time
         self.start_time = None
 
-        # default next poll time
-        self._next_poll_time = None
-
         # retrieval flag
         self.retrieving = False
 
         # default context flag
         self.context = False
+
+        # time in ms between polls
+        poll_time = int(self.config['fetch']['poll_time'])
+
+        if poll_time < 1000:
+            # since the runner sleeps for 1s between checks, times less than
+            # 1 second aren't supported
+            raise ValueError("Poll times less than 1000 ms aren't supported")
+
+        self.poll_time = poll_time
+        logger.info("Poll time: {0:.2f} ms".format(self.poll_time))
 
     def run(self):
         """Starts streaming data from the ADC"""
@@ -50,18 +58,14 @@ class Retriever(threading.Thread):
         if not self.adc.is_open():
             raise Exception("Device is not open")
 
-        # time between polls
-        poll_time = int(self.config['fetch']['poll_time'])
-        logger.info("Poll time: {0:.2f} ms".format(poll_time))
-
         # start streaming
         self.adc.stream()
 
         # start time
         self.start_time = int(round(time.time() * 1000))
 
-        # default next poll time
-        self._next_poll_time = self.start_time
+        # next poll time is now plus the poll time (in ms)
+        next_poll_time = int(round(time.time() * 1000)) + self.poll_time
 
         # set status on
         self.retrieving = True
@@ -69,34 +73,39 @@ class Retriever(threading.Thread):
         # main run loop
         while self.retrieving:
             # time in ms
-            current_time = int(round(time.time() * 1000))
+            now = int(round(time.time() * 1000))
 
-            # ms since start
-            time_since_start = current_time - self.start_time
+            if now < next_poll_time:
+                # sleep, but not for too long so that the thread exits quickly
+                # when asked
+                time.sleep(1)
+            else:
+                # fetch latest readings
+                self.fetch_readings()
 
-            if current_time < self._next_poll_time:
-                # skip this loop
-                continue
+                # set the next poll time
+                next_poll_time += self.poll_time
 
-            logger.debug("+%i polling ADC", time_since_start)
+    def fetch_readings(self):
+        logger.debug("Polling ADC")
 
-            # check if ADC has values to retrieve
-            if self.adc.ready():
-                # get readings
-                readings = self.adc.get_readings()
+        # check if ADC has values to retrieve
+        if not self.adc.ready():
+            logger.debug("No new readings")
+            return
 
-                # number of readings retrieved
-                n_readings = len(readings)
+        # get readings
+        readings = self.adc.get_readings()
 
-                # make sure readings aren't empty
-                if n_readings > 0:
-                    # store data
-                    self.datastore.insert(readings)
+        # number of readings retrieved
+        n_readings = len(readings)
 
-                    logger.debug("Fetched %i readings", n_readings)
+        # make sure readings aren't empty
+        if n_readings > 0:
+            # store data
+            self.datastore.insert(readings)
 
-            # set the next poll time
-            self._next_poll_time += poll_time
+            logger.debug("Fetched %i readings", n_readings)
 
     def stop(self):
         """Stops the ADC data stream"""
