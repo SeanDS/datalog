@@ -18,9 +18,10 @@ working before using this library.
 ## Installation
 Installation is handled by `setup.py`. This is most easily handled by `pip`:
 ```bash
-pip3 install git+https://github.com/SeanDS/datalog.git
+pip3 install datalog
 ```
-This installs the Python package dependencies automatically.
+This installs the Python package dependencies automatically. If the above command doesn't make sense, try reading
+[this introduction to pip](https://packaging.python.org/tutorials/installing-packages/).
 
 ## Use
 The documentation should help to get you started. Compile it with:
