@@ -39,14 +39,16 @@ class Adc(Device, metaclass=abc.ABCMeta):
 
         # import libraries now that they are needed
         # (doing this earlier can lead to circular imports)
-        from datalog.adc.hrdl.picolog import PicoLogAdc24, PicoLogAdc24Sim
+        from datalog.adc.hrdl.picolog import PicoLogAdc24, PicoLogAdc24Sim, PicoLogAdc20
 
         if config['adc']['type'] == 'PicoLog24':
             return PicoLogAdc24(config)
         elif config['adc']['type'] == 'PicoLog24Sim':
             return PicoLogAdc24Sim(config)
+        elif config['adc']['type'] == 'PicoLog20':
+            return PicoLogAdc20(config)
 
-        ValueError('Unrecognised unit type')
+        raise ValueError('Unrecognised unit type')
 
     @contextmanager
     def get_retriever(self, datastore):

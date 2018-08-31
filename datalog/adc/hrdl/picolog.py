@@ -108,9 +108,9 @@ class PicoLogAdc24(Adc):
         self.handle = self._hrdl_open()
 
         if not Handle.is_valid_handle(self.handle):
-            if self.handle.value == Handle.UNIT_NOT_FOUND:
+            if self.handle == Handle.UNIT_NOT_FOUND:
                 raise Exception('Unit not found')
-            elif self.handle.value == Handle.UNIT_NOT_OPENED:
+            elif self.handle == Handle.UNIT_NOT_OPENED:
                 raise Exception('Unit found but not opened')
             else:
                 raise Exception('Unknown invalid handle status')
@@ -653,7 +653,6 @@ class PicoLogAdc24(Adc):
 
 class PicoLogAdc24Sim(PicoLogAdc24):
     """Represents a simulated :class:`PicoLogAdc24` useful for testing"""
-
     # maximum string buffer (guess)
     MAX_BUF_LEN = 2 ** 32 / 2 - 1
 
@@ -918,3 +917,8 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         self._c_maximum_count.value = self.MAX_COUNT
 
         return 1
+
+
+class PicoLogAdc20(PicoLogAdc24):
+    """PicoLog ADC20 driver wrapper (experimental)"""
+    NUM_CHANNELS = 8
