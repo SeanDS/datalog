@@ -1,13 +1,18 @@
 """Abstract data logging device classes"""
 
 import abc
+import logging
+from . import __version__
+
+# logger
+logger = logging.getLogger("datalog")
 
 
 class Device(object, metaclass=abc.ABCMeta):
     """Abstract DataLog device"""
 
     def __init__(self):
-        pass
+        logger.info("Init datalog %s" % __version__)
 
     @abc.abstractmethod
     def is_open(self):
