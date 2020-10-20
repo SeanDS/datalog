@@ -208,7 +208,7 @@ class PicoLogAdc24(Adc):
 
         # length is zero if one of the parameters specified in the function call
         # above is out of range, or a null message pointer is specified
-        if length is 0:
+        if length == 0:
             raise Exception('Info type out of range or null message pointer')
 
         # extract and return string from buffer
@@ -423,10 +423,18 @@ class PicoLogAdc24(Adc):
         self._c_sample_method.value = int(sample_method)
 
         # run
-        status = self._hrdl_run(self.handle,
+        if (sample_method == SampleMethod.STREAM):
+            status = self._hrdl_run(self.handle,
                                 self._c_sample_buf_len,
                                 self._c_sample_method)
-
+        elif (sample_method == SampleMethod.BLOCK):
+            # We only want sample_buf_len / num_channels, samples-per-channel
+            # calculate number of values to collect for each channel
+            self._samples_per_channel = (ctypes.c_long(int(self.config['device']['sample_buf_len']) // len(self.enabled_channels)))
+            
+            status = self._hrdl_run(self.handle,
+                                self._samples_per_channel,
+                                self._c_sample_method)
         # check return status
         if not Status.is_valid_status(status):
             # run failure
@@ -439,6 +447,16 @@ class PicoLogAdc24(Adc):
 
         # run stream
         self._run(SampleMethod.STREAM)
+
+        # save timestamp
+        self.stream_start_timestamp = int(round(time.time() * 1000))
+
+    def block(self):
+
+        logger.info("Starting unit in BLOCK mode")
+        
+        # run
+        self._run(SampleMethod.BLOCK)
 
         # save timestamp
         self.stream_start_timestamp = int(round(time.time() * 1000))
@@ -491,7 +509,7 @@ class PicoLogAdc24(Adc):
             ctypes.c_long(samples_per_channel))
 
         # check return status
-        if num_samples is 0:
+        if num_samples == 0:
             raise Exception("Call failed or no values available")
 
         # convert times and values into Python lists
@@ -608,6 +626,9 @@ class PicoLogAdc24(Adc):
 
     def _hrdl_open(self):
         return int(self.lib.HRDLOpenUnit())
+        
+    def _hrdl_stop(self, handle):
+        return int(self.lib.HRDLStop(handle))
 
     def _hrdl_close(self, handle):
         return int(self.lib.HRDLCloseUnit(handle))
@@ -649,7 +670,6 @@ class PicoLogAdc24(Adc):
                                      channel):
         return int(self.lib.HRDLGetMinMaxAdcCounts(handle, ptr_min_count,
                                                    ptr_max_count, channel))
-
 
 class PicoLogAdc24Sim(PicoLogAdc24):
     """Represents a simulated :class:`PicoLogAdc24` useful for testing"""
@@ -727,7 +747,17 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # set the time to use for readings
         self._last_fake_request_time = self.stream_start_timestamp
 
+    def block(self):
+        # call parent
+        super(PicoLogAdc24Sim, self).block()
+
+        # set the time to use for readings
+        self._last_fake_request_time = self.stream_start_timestamp
+
     def _hrdl_open(self):
+        return 1
+
+    def _hrdl_stop(self, handle):
         return 1
 
     def _hrdl_close(self, handle):
