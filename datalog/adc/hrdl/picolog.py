@@ -771,6 +771,9 @@ class PicoLogAdc24Sim(PicoLogAdc24):
     def _hrdl_open(self):
         return 1
 
+    def _hrdl_stop(self, handle):
+        return 1
+
     def _hrdl_close(self, handle):
         # success
         return 1
