@@ -623,6 +623,9 @@ class PicoLogAdc24(Adc):
         # return channel ADC counts
         return (int(self._c_minimum_count.value),
                 int(self._c_maximum_count.value))
+		
+    def set_mains_rejection(self, sixty_hertz):
+        return self._hrdl_set_mains(self.handle, ctypes.c_int16(sixty_hertz))
 
     def _hrdl_open(self):
         return int(self.lib.HRDLOpenUnit())
@@ -670,6 +673,24 @@ class PicoLogAdc24(Adc):
                                      channel):
         return int(self.lib.HRDLGetMinMaxAdcCounts(handle, ptr_min_count,
                                                    ptr_max_count, channel))
+
+    # Add get_values function - nickcrisp 9/10/20
+    def _hrdl_get_values(self, handle, pnt_sample_values, pnt_overflow, samples_per_channel):
+        return int(self.lib.HRDLGetValues(handle,
+                                                  pnt_sample_values,
+                                                  pnt_overflow,
+                                                  samples_per_channel))
+    def _hrdl_get_single_value(self, handle, channel, ch_range, conversionTime, singelEnded, pnt_overflow, pnt_value):
+        return int(self.lib.HRDLGetSingleValue(handle,
+                                                  channel,
+                                                  ch_range,
+                                                  conversionTime,
+                                                  singleEnded,
+                                                  pnt_overflow,
+                                                  pnt_value))
+						  
+    def _hrdl_set_mains(self, handle, sixty_hertz):
+        return int(self.lib.HRDLSetMains(handle, sixty_hertz))
 
 class PicoLogAdc24Sim(PicoLogAdc24):
     """Represents a simulated :class:`PicoLogAdc24` useful for testing"""
@@ -743,13 +764,6 @@ class PicoLogAdc24Sim(PicoLogAdc24):
     def stream(self):
         # call parent
         super(PicoLogAdc24Sim, self).stream()
-
-        # set the time to use for readings
-        self._last_fake_request_time = self.stream_start_timestamp
-
-    def block(self):
-        # call parent
-        super(PicoLogAdc24Sim, self).block()
 
         # set the time to use for readings
         self._last_fake_request_time = self.stream_start_timestamp
